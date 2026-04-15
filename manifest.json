@@ -1,0 +1,26 @@
+{
+  "name": "Veloce Taller",
+  "short_name": "Veloce",
+  "description": "Gestión de taller de bicicletas",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#D85A30",
+  "lang": "es-CO",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='32' fill='%23D85A30'/%3E%3Ctext x='96' y='118' font-family='system-ui,sans-serif' font-size='80' font-weight='700' text-anchor='middle' fill='white'%3EV%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='80' fill='%23D85A30'/%3E%3Ctext x='256' y='320' font-family='system-ui,sans-serif' font-size='220' font-weight='700' text-anchor='middle' fill='white'%3EV%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

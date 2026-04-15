@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#D85A30">
+<link rel="manifest" href="manifest.json">
+<title>Veloce Taller</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Pantalla de login -->
+<div id="login-screen" class="login-screen" style="display:none">
+  <div class="login-card">
+    <div class="login-logo">
+      <svg viewBox="0 0 200 60" style="height:40px">
+        <rect x="10" y="12" width="20" height="3" rx="1.5" fill="#1B7B2C"/>
+        <rect x="32" y="12" width="20" height="3" rx="1.5" fill="#e0e0e0"/>
+        <rect x="54" y="12" width="20" height="3" rx="1.5" fill="#CE1126"/>
+        <text x="10" y="44" font-family="system-ui,sans-serif" font-size="24" font-weight="800" fill="#D85A30" letter-spacing="1">VELOCE</text>
+      </svg>
+      <p style="font-size:11px;color:#888;margin-top:2px">Gestión de Taller</p>
+    </div>
+    <form id="login-form" onsubmit="handleLogin(event)">
+      <div class="section">
+        <label>Email</label>
+        <input id="login-email" type="email" required placeholder="tu@veloce.co" autocomplete="username">
+      </div>
+      <div class="section">
+        <label>Contraseña</label>
+        <input id="login-password" type="password" required placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div id="login-error" class="login-error" style="display:none"></div>
+      <button type="submit" class="btn btn-primary" id="login-btn" style="width:100%;margin-top:8px">Ingresar al taller</button>
+    </form>
+  </div>
+</div>
+
+<!-- Loading screen -->
+<div id="loading-screen" class="loading-screen" style="display:flex">
+  <div class="loader"></div>
+  <p style="margin-top:12px;color:#888;font-size:13px">Cargando...</p>
+</div>
+
+<!-- App principal -->
+<div class="app" id="app" style="display:none">
+<div class="search-global">
+  <input type="text" id="global-search" placeholder="🔍 Buscar orden #, cliente, bicicleta..." oninput="busquedaGlobal(this.value)" onblur="setTimeout(()=>document.getElementById('search-results').style.display='none',200)" onfocus="if(this.value)document.getElementById('search-results').style.display='block'">
+  <div class="search-results" id="search-results"></div>
+</div>
+<div class="header-actions">
+  <span class="meta" id="user-email" style="margin-right:auto;align-self:center;font-size:11px"></span>
+  <button class="btn btn-sm" onclick="handleLogout()">Salir</button>
+</div>
+<div class="nav">
+  <button class="nav-btn active" onclick="showView('asesor')">Asesor</button>
+  <button class="nav-btn" onclick="showView('mecanico')">Mecánico <span class="badge" id="mec-badge" style="display:none">0</span></button>
+  <button class="nav-btn" onclick="showView('caja')">Caja</button>
+  <button class="nav-btn" onclick="showView('historial')">Historial</button>
+  <button class="nav-btn" onclick="showView('notif')">Alertas <span class="badge" id="notif-badge" style="display:none">0</span></button>
+</div>
+
+<div id="view-asesor">
+  <div class="card">
+    <div class="card-header"><h2>Nuevo ingreso de bicicleta</h2></div>
+    <div class="section">
+      <label>Cédula o nombre del cliente</label>
+      <div style="display:flex;gap:6px">
+        <input id="cli-id" type="text" placeholder="Ej: 1234567890" style="flex:1">
+        <button class="btn btn-sm" onclick="buscarCliente()">Buscar</button>
+        <button class="btn btn-sm btn-primary" onclick="mostrarFormNuevoCliente()">+ Nuevo</button>
+      </div>
+    </div>
+    <div id="cliente-encontrado" style="display:none" class="cliente-info"><div id="cliente-datos"></div></div>
+    <div id="form-nuevo-cliente" style="display:none">
+      <hr class="divider"><h3 style="margin-bottom:10px">Datos del cliente</h3>
+      <div class="grid2">
+        <div class="section"><label>Nombre completo</label><input id="cli-nombre" type="text"></div>
+        <div class="section"><label>Teléfono / WhatsApp</label><input id="cli-tel" type="text" placeholder="3001234567"></div>
+      </div>
+      <div class="section"><label>Email</label><input id="cli-email" type="email"></div>
+    </div>
+    <hr class="divider"><h3 style="margin-bottom:10px">Bicicleta</h3>
+    <div id="bici-select-div" style="display:none" class="section">
+      <label>Bicicletas del cliente</label>
+      <select id="bici-select" onchange="seleccionarBici(this.value)">
+        <option value="">— Seleccionar —</option><option value="nueva">+ Nueva bicicleta</option>
+      </select>
+    </div>
+    <div id="form-bici">
+      <div class="grid3">
+        <div class="section"><label>Marca</label><input id="bici-marca" type="text" placeholder="Orbea, Chapter 2..."></div>
+        <div class="section"><label>Modelo</label><input id="bici-modelo" type="text" placeholder="Orca, Rere..."></div>
+        <div class="section"><label>Color</label><input id="bici-color" type="text"></div>
+      </div>
+      <div class="grid2">
+        <div class="section"><label>Número de serie</label><input id="bici-serie" type="text"></div>
+        <div class="section"><label>Año</label><input id="bici-año" type="number"></div>
+      </div>
+    </div>
+    <hr class="divider">
+    <div class="section">
+      <label style="margin-bottom:8px">Tipo de trabajo</label>
+      <div class="tipo-grid" id="tipo-grid"></div>
+      <div id="otro-input-wrap" style="display:none;margin-top:6px">
+        <input id="otro-texto" type="text" placeholder="Describe el tipo de trabajo...">
+      </div>
+    </div>
+    <div class="section"><label>Descripción / observaciones</label><textarea id="ing-descripcion"></textarea></div>
+    <div class="section"><label>Fotos de la bicicleta (opcional)</label>
+      <div class="foto-upload" onclick="document.getElementById('ing-fotos-input').click()">📷 Toca para agregar fotos</div>
+      <input id="ing-fotos-input" type="file" accept="image/*" multiple capture="environment" style="display:none" onchange="agregarFotosIngreso(this)">
+      <div class="fotos-grid" id="ing-fotos-preview"></div>
+    </div>
+    <div class="grid2">
+      <div class="section"><label>Prioridad</label>
+        <select id="ing-prioridad"><option value="normal">Normal</option><option value="urgente">Urgente</option><option value="espera">Puede esperar</option></select>
+      </div>
+      <div class="section"><label>Mecánico asignado <span style="cursor:pointer;color:#D85A30" onclick="gestionarMecanicos()">⚙ editar</span></label>
+        <select id="ing-mecanico"></select>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+      <button class="btn" onclick="limpiarFormulario()">Limpiar</button>
+      <button class="btn btn-primary" onclick="crearIngreso()">Crear ingreso</button>
+    </div>
+  </div>
+  <div id="ordenes-recientes"></div>
+</div>
+
+<div id="view-mecanico" style="display:none">
+  <div class="tabs">
+    <button class="tab active" onclick="filtrarMec('pending')">Pendientes</button>
+    <button class="tab" onclick="filtrarMec('in-progress')">En progreso</button>
+    <button class="tab" onclick="filtrarMec('done')">Terminadas</button>
+    <button class="tab" onclick="filtrarMec('all')">Todas</button>
+  </div>
+  <div id="lista-mecanico"></div>
+</div>
+
+<div id="view-historial" style="display:none">
+  <div class="card">
+    <div class="section" style="margin-bottom:0">
+      <label>Buscar cliente o bicicleta</label>
+      <input type="text" id="hist-search" placeholder="Nombre, cédula, marca..." oninput="buscarHistorial()">
+    </div>
+  </div>
+  <div id="hist-resultados"></div>
+</div>
+
+<div id="view-caja" style="display:none"><div id="caja-contenido"></div></div>
+<div id="view-notif" style="display:none"><div id="alertas-lista"></div></div>
+
+<div class="modal-wrap" id="modal-orden">
+  <div class="modal-inner">
+    <div class="card-header"><h2 id="modal-titulo">Orden</h2><button class="btn btn-sm" onclick="cerrarModal()">✕ Cerrar</button></div>
+    <div id="modal-contenido"></div>
+  </div>
+</div>
+<div class="toast-wrap" id="toast-wrap"></div>
+<div class="lightbox" id="lightbox" onclick="this.style.display='none'"><img id="lightbox-img" src=""></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="db.js"></script>
+<script src="auth.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
