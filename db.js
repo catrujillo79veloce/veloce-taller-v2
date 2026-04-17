@@ -264,7 +264,7 @@ async function dbSetReparaciones(oid, reparaciones){
   await sb.from('repuestos').delete().eq('orden_id', oid);
   if(reparaciones && reparaciones.length){
     const rows = reparaciones
-      .filter(r => r.desc || r.precio)
+      .filter(r => r.desc || r.precio || r.codigo)
       .map(r => ({
         orden_id: oid,
         descripcion: r.desc || '',
