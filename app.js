@@ -421,7 +421,9 @@ function buildMensajeCliente(o){
   }
   if([cl.torqueSillin,cl.torqueEspiga,cl.torqueManubrio].some(Boolean)){msg+=`🔩 *Torques aplicados:*\n`;if(cl.torqueSillin)msg+=`• Tubo de sillín: ${cl.torqueSillin}\n`;if(cl.torqueEspiga)msg+=`• Espiga tija: ${cl.torqueEspiga}\n`;if(cl.torqueManubrio)msg+=`• Espiga manubrio: ${cl.torqueManubrio}\n`;msg+=`\n`}
   if(o.notas)msg+=`💬 *Nota del mecánico:* ${o.notas}\n\n`;
-  msg+=`¡Te esperamos en el taller para que la recojas! 🚴‍♂️`;return msg;
+  msg+=`¡Te esperamos en el taller para que la recojas! 🚴‍♂️\n\n`;
+  msg+=`⚠️ *Nota:* A partir del tercer día después de finalizado el servicio, se cobrarán *$1.500 pesos diarios* por concepto de bodegaje.`;
+  return msg;
 }
 function verReporte(oid){
   const o=state.ordenes.find(o=>o.id===oid);if(!o)return;
@@ -440,15 +442,36 @@ function buscarHistorial(){
   if(!clientes.length){div.innerHTML='<div class="empty">Sin resultados</div>';return}
   div.innerHTML=clientes.map(cli=>{const ords=state.ordenes.filter(o=>o._clienteUuid===cli._uuid);const cid=encodeURIComponent(cli.id);return`<div class="card"><div class="card-header"><div style="cursor:pointer;flex:1" onclick="toggleHist('hc-${cid}')"><h3>${esc(cli.nombre)}</h3><div class="meta">${esc(cli.tel)} · ${ords.length} servicio(s)</div></div><div style="display:flex;gap:4px"><a class="btn btn-sm wa-btn" href="${waLink(cli.tel,'Hola '+cli.nombre)}" target="_blank" rel="noopener" style="padding:2px 8px;font-size:11px">📱</a><button class="btn btn-sm" onclick="editarCliente('${esc(cli.id)}')">✏</button><button class="btn btn-sm" style="color:#E24B4A;border-color:#E24B4A" onclick="eliminarCliente('${esc(cli.id)}')">🗑</button></div></div><div id="hc-${cid}" style="display:none"><hr class="divider">${(cli.bicicletas||[]).map((b,bi)=>{const bo=ords.filter(o=>o._biciUuid===b._id);return`<div class="hist-bici"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-weight:500;font-size:13px">${esc(b.marca)} ${esc(b.modelo)}${b.color?' · '+esc(b.color):''}${b.año?' ('+esc(b.año)+')':''}</div><button class="btn btn-sm" style="color:#E24B4A;border-color:#E24B4A;padding:2px 6px" onclick="eliminarBici('${b._id}')">🗑</button></div>${bo.map(o=>`<div class="hist-entry"><div style="display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:500">#${o.id} · ${fmtDate(o.creado)}</span><span class="status s-${o.status}">${statusLabel(o.status)}</span></div><div class="meta">${esc((o.tiposTrabajo||[]).join(', '))}</div>${o.reparaciones&&o.reparaciones.length?`<div class="meta">${esc(o.reparaciones.map(r=>r.desc).filter(Boolean).join(', '))}</div>`:''}<button class="btn btn-sm" style="margin-top:4px" onclick="abrirOrden(${o.id})">Ver detalle</button></div>`).join('')}</div>`}).join('')}</div></div>`}).join('');
 }
-async function editarCliente(cid){
+function editarCliente(cid){
   const c=state.clientes.find(x=>x.id===cid);if(!c)return;
-  const nombre=prompt('Nombre:',c.nombre);if(nombre===null)return;
-  const tel=prompt('Teléfono:',c.tel);if(tel===null)return;
-  const email=prompt('Email:',c.email||'');if(email===null)return;
+  document.getElementById('ec-cid').value=cid;
+  document.getElementById('ec-uuid').value=c._uuid||'';
+  document.getElementById('ec-nombre').value=c.nombre||'';
+  document.getElementById('ec-tel').value=c.tel||'';
+  document.getElementById('ec-email').value=c.email||'';
+  document.getElementById('ec-cedula-display').value=c._cedula||'Sin cédula';
+  const msg=document.getElementById('ec-msg');msg.style.display='none';msg.textContent='';
+  document.getElementById('ec-save-btn').disabled=false;
+  document.getElementById('modal-editar-cliente').style.display='block';
+}
+function cerrarModalEditarCliente(){document.getElementById('modal-editar-cliente').style.display='none'}
+async function guardarEdicionCliente(){
+  const uuid=document.getElementById('ec-uuid').value;
+  const nombre=document.getElementById('ec-nombre').value.trim();
+  const tel=document.getElementById('ec-tel').value.trim();
+  const email=document.getElementById('ec-email').value.trim();
+  const msg=document.getElementById('ec-msg');
+  if(!nombre){msg.style.display='block';msg.style.background='#fef2f2';msg.style.color='#b91c1c';msg.textContent='El nombre es obligatorio.';return}
+  const btn=document.getElementById('ec-save-btn');btn.disabled=true;btn.textContent='Guardando...';
   try{
-    await window.db.updateClienteByCedula(cid,{nombre:nombre.trim()||c.nombre,tel:tel.trim()||c.tel,email:email.trim()});
-    await refrescarVista();toast('Cliente actualizado','success');
-  }catch(err){toast('Error: '+err.message,'error')}
+    await window.db.updateClienteByUuid(uuid,{nombre,tel,email});
+    await refrescarVista();
+    cerrarModalEditarCliente();
+    toast('Cliente actualizado','success');
+  }catch(err){
+    msg.style.display='block';msg.style.background='#fef2f2';msg.style.color='#b91c1c';msg.textContent='Error: '+err.message;
+    btn.disabled=false;btn.textContent='Guardar cambios';
+  }
 }
 async function eliminarCliente(cid){
   const ords=state.ordenes.filter(o=>o.clienteId===cid).length;

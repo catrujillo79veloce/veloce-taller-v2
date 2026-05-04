@@ -157,6 +157,15 @@ async function dbUpdateClienteByCedula(cedula, patches){
   if(error) throw error;
 }
 
+async function dbUpdateClienteByUuid(uuid, patches){
+  const dbPatch = {};
+  if(patches.nombre !== undefined) dbPatch.nombre = patches.nombre;
+  if(patches.tel !== undefined) dbPatch.telefono = patches.tel;
+  if(patches.email !== undefined) dbPatch.email = patches.email || null;
+  const { error } = await sb.from('clientes').update(dbPatch).eq('id', uuid);
+  if(error) throw error;
+}
+
 async function dbDeleteClienteByCedula(cedula){
   const { data: c } = await sb.from('clientes').select('id').eq('cedula', cedula).maybeSingle();
   if(!c) return;
@@ -307,6 +316,7 @@ window.db = {
   loadAll: dbLoadAll,
   upsertCliente: dbUpsertCliente,
   updateClienteByCedula: dbUpdateClienteByCedula,
+  updateClienteByUuid: dbUpdateClienteByUuid,
   deleteClienteByCedula: dbDeleteClienteByCedula,
   createBici: dbCreateBici,
   deleteBici: dbDeleteBici,
