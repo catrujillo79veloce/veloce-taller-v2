@@ -107,6 +107,7 @@ create table consignaciones (
   talla text not null default 'Otra',
   color text not null default '',
   precio numeric(10,2) not null default 0,
+  comision_pct numeric(5,2) not null default 8,
   contacto_nombre text not null,
   contacto_tel text not null,
   notas text default '',

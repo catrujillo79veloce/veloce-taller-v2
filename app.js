@@ -610,13 +610,14 @@ let consFilter = 'disponible';
 
 const CONS_STATUS_LABEL = { disponible: 'Disponible', vendida: 'Vendida', retirada: 'Retirada' };
 const CONS_STATUS_CLASS = { disponible: 's-cons-disp', vendida: 's-cons-vend', retirada: 's-cons-ret' };
-const COMISION_PCT = 0.08; // 8% taller
+const COMISION_PCT_DEFAULT = 8; // % por defecto
 
-function calcComision(precio){
+function calcComision(precio, pct){
   const p = parseFloat(precio) || 0;
-  const comision = Math.round(p * COMISION_PCT);
+  const pp = pct != null ? parseFloat(pct) : COMISION_PCT_DEFAULT;
+  const comision = Math.round(p * pp / 100);
   const propietario = p - comision;
-  return { precio: p, comision, propietario };
+  return { precio: p, pct: pp, comision, propietario };
 }
 
 function renderConsignacion(){
@@ -627,13 +628,13 @@ function renderConsignacion(){
 
   // Resumen totales del filtro actual
   const totVentas = items.reduce((s,c)=>s+(parseFloat(c.precio)||0),0);
-  const totComision = items.reduce((s,c)=>s+calcComision(c.precio).comision,0);
+  const totComision = items.reduce((s,c)=>s+calcComision(c.precio,c.comisionPct).comision,0);
   const totPropietario = totVentas - totComision;
   const resumen = items.length ? `<div class="cons-resumen">
     <div><span class="cons-resumen-lbl">${items.length} bici(s) · ${CONS_STATUS_LABEL[consFilter]||'Todas'}</span></div>
     <div class="cons-resumen-row"><span>Total ventas</span><strong>${fmt(totVentas)}</strong></div>
-    <div class="cons-resumen-row"><span>Comisión taller (8%)</span><strong style="color:#1D9E75">${fmt(totComision)}</strong></div>
-    <div class="cons-resumen-row"><span>A propietarios (92%)</span><strong>${fmt(totPropietario)}</strong></div>
+    <div class="cons-resumen-row"><span>Comisión taller</span><strong style="color:#1D9E75">${fmt(totComision)}</strong></div>
+    <div class="cons-resumen-row"><span>A propietarios</span><strong>${fmt(totPropietario)}</strong></div>
   </div>` : '';
 
   if(!items.length){
@@ -641,7 +642,7 @@ function renderConsignacion(){
     return;
   }
   lista.innerHTML = resumen + items.map(c => {
-    const calc = calcComision(c.precio);
+    const calc = calcComision(c.precio, c.comisionPct);
     const wa = c.contactoTel ? `<a href="${waLink(c.contactoTel,'Hola '+esc(c.contactoNombre)+', te contactamos por la bicicleta '+esc(c.producto)+' que dejaste en consignación en Veloce.')}" target="_blank" class="btn btn-sm wa-btn" style="text-decoration:none">WhatsApp</a>` : '';
     const acciones = c.status==='disponible'
       ? `<button class="btn btn-sm btn-success" onclick="cambiarStatusConsignacion(${c.id},'vendida')">Vendida</button>
@@ -661,7 +662,7 @@ function renderConsignacion(){
         <span class="cons-tag">${esc(c.color)}</span>
       </div>
       <div class="cons-comision">
-        <div><span>Comisión taller (8%)</span><strong style="color:#1D9E75">${fmt(calc.comision)}</strong></div>
+        <div><span>Comisión taller (${calc.pct}%)</span><strong style="color:#1D9E75">${fmt(calc.comision)}</strong></div>
         <div><span>Recibe propietario</span><strong>${fmt(calc.propietario)}</strong></div>
       </div>
       <div class="cons-contacto">
@@ -681,13 +682,14 @@ function renderConsignacion(){
 
 function actualizarComisionPreview(){
   const precio = parseFloat(document.getElementById('cons-precio').value) || 0;
-  const calc = calcComision(precio);
+  const pct = parseFloat(document.getElementById('cons-comision-pct').value);
+  const calc = calcComision(precio, isNaN(pct) ? COMISION_PCT_DEFAULT : pct);
   const prev = document.getElementById('cons-comision-preview');
   if(!prev) return;
   const fmt = n => '$ '+n.toLocaleString('es-CO');
   if(precio <= 0){ prev.style.display='none'; return; }
   prev.style.display='block';
-  prev.innerHTML = `<div><span>Comisión taller (8%)</span><strong style="color:#1D9E75">${fmt(calc.comision)}</strong></div>
+  prev.innerHTML = `<div><span>Comisión taller (${calc.pct}%)</span><strong style="color:#1D9E75">${fmt(calc.comision)}</strong></div>
                     <div><span>Recibe el propietario</span><strong>${fmt(calc.propietario)}</strong></div>`;
 }
 
@@ -708,6 +710,7 @@ function abrirFormConsignacion(id){
   document.getElementById('cons-talla').value = 'M';
   document.getElementById('cons-color').value = '';
   document.getElementById('cons-precio').value = '';
+  document.getElementById('cons-comision-pct').value = COMISION_PCT_DEFAULT;
   document.getElementById('cons-contacto-nombre').value = '';
   document.getElementById('cons-contacto-tel').value = '';
   document.getElementById('cons-notas').value = '';
@@ -724,6 +727,7 @@ function abrirFormConsignacion(id){
     document.getElementById('cons-talla').value = c.talla;
     document.getElementById('cons-color').value = c.color;
     document.getElementById('cons-precio').value = c.precio;
+    document.getElementById('cons-comision-pct').value = c.comisionPct != null ? c.comisionPct : COMISION_PCT_DEFAULT;
     document.getElementById('cons-contacto-nombre').value = c.contactoNombre;
     document.getElementById('cons-contacto-tel').value = c.contactoTel;
     document.getElementById('cons-notas').value = c.notas;
@@ -745,6 +749,8 @@ async function guardarConsignacion(){
   const talla = document.getElementById('cons-talla').value;
   const color = document.getElementById('cons-color').value.trim();
   const precio = parseFloat(document.getElementById('cons-precio').value) || 0;
+  const comisionPctRaw = parseFloat(document.getElementById('cons-comision-pct').value);
+  const comisionPct = isNaN(comisionPctRaw) ? COMISION_PCT_DEFAULT : Math.max(0, Math.min(100, comisionPctRaw));
   const contactoNombre = document.getElementById('cons-contacto-nombre').value.trim();
   const contactoTel = document.getElementById('cons-contacto-tel').value.trim();
   const notas = document.getElementById('cons-notas').value.trim();
@@ -757,7 +763,7 @@ async function guardarConsignacion(){
   const btn = document.getElementById('cons-save-btn');
   btn.disabled=true;btn.textContent='Guardando...';
   try {
-    const data = {producto,tipo,talla,color,precio,contactoNombre,contactoTel,notas};
+    const data = {producto,tipo,talla,color,precio,comisionPct,contactoNombre,contactoTel,notas};
     if(editId){
       await window.db.updateConsignacion(parseInt(editId), data);
       toast('Consignación actualizada','success');

@@ -91,6 +91,7 @@ function adaptConsignacion(row){
     talla: row.talla || '',
     color: row.color || '',
     precio: parseFloat(row.precio) || 0,
+    comisionPct: row.comision_pct != null ? parseFloat(row.comision_pct) : 8,
     contactoNombre: row.contacto_nombre || '',
     contactoTel: row.contacto_tel || '',
     notas: row.notas || '',
@@ -341,6 +342,7 @@ async function dbCreateConsignacion(data){
     talla: data.talla,
     color: data.color || '',
     precio: parseFloat(data.precio) || 0,
+    comision_pct: data.comisionPct != null ? parseFloat(data.comisionPct) : 8,
     contacto_nombre: data.contactoNombre,
     contacto_tel: data.contactoTel,
     notas: data.notas || '',
@@ -357,6 +359,7 @@ async function dbUpdateConsignacion(id, patches){
   if(patches.talla !== undefined) dbPatch.talla = patches.talla;
   if(patches.color !== undefined) dbPatch.color = patches.color;
   if(patches.precio !== undefined) dbPatch.precio = parseFloat(patches.precio) || 0;
+  if(patches.comisionPct !== undefined) dbPatch.comision_pct = parseFloat(patches.comisionPct) || 0;
   if(patches.contactoNombre !== undefined) dbPatch.contacto_nombre = patches.contactoNombre;
   if(patches.contactoTel !== undefined) dbPatch.contacto_tel = patches.contactoTel;
   if(patches.notas !== undefined) dbPatch.notas = patches.notas;
