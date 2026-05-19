@@ -528,20 +528,20 @@ function imprimirRecibo(oid){
   const reps2 = reps.filter(r => r.desc || r.codigo || r.precio);
   const html=`<!DOCTYPE html><html><head><title>Recibo orden #${o.id}</title><style>
   *{box-sizing:border-box;margin:0;padding:0;font-family:'Arial Black','Helvetica',sans-serif;font-weight:700;color:#000}
-  @page{size:80mm auto;margin:0}
-  body{padding:3mm 5mm;color:#000;max-width:80mm;margin:0 auto;font-size:11px;line-height:1.35}
+  @page{size:78mm auto;margin:0}
+  body{padding:3mm 8mm;color:#000;max-width:78mm;margin:0 auto;font-size:11px;line-height:1.35}
   .logo{text-align:center;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}
-  .logo img{max-width:55mm;height:auto;display:block;margin:0 auto 4px}
-  .logo p{font-size:10px;margin-top:2px;letter-spacing:.5px}
-  .row{display:flex;justify-content:space-between;margin-bottom:3px;gap:6px}
-  .row strong{min-width:55px;display:inline-block;flex-shrink:0}
-  h2{font-size:12px;margin:8px 0 4px;padding-bottom:2px;border-bottom:1px solid #000;text-transform:uppercase;letter-spacing:.5px}
+  .logo img{max-width:48mm;height:auto;display:block;margin:0 auto 4px}
+  .logo p{font-size:10px;margin-top:2px;letter-spacing:.3px}
+  .row{display:flex;justify-content:space-between;margin-bottom:3px;gap:4px}
+  .row strong{min-width:50px;display:inline-block;flex-shrink:0}
+  h2{font-size:12px;margin:8px 0 4px;padding-bottom:2px;border-bottom:1px solid #000;text-transform:uppercase;letter-spacing:.3px}
   .box{padding:4px 0;margin-bottom:6px;font-size:11px}
   .total{display:flex;justify-content:space-between;font-size:14px;border-top:2px solid #000;padding-top:6px;margin-top:6px}
   .footer{text-align:center;margin-top:14px;padding-top:8px;border-top:1px dashed #000;font-size:10px}
-  .orden-num{text-align:center;font-size:14px;margin:6px 0;border:2px solid #000;padding:5px;text-transform:uppercase;letter-spacing:.5px}
-  .srv-head{display:grid;grid-template-columns:16mm 1fr 18mm;gap:3px;font-size:10px;border-bottom:1px solid #000;padding-bottom:2px;margin-bottom:3px;text-transform:uppercase}
-  .srv-row{display:grid;grid-template-columns:16mm 1fr 18mm;gap:3px;font-size:11px;padding:2px 0;border-bottom:1px dotted #999;overflow-wrap:anywhere}
+  .orden-num{text-align:center;font-size:14px;margin:6px 0;border:2px solid #000;padding:5px;text-transform:uppercase;letter-spacing:.3px}
+  .srv-head{display:grid;grid-template-columns:14mm 1fr 15mm;gap:2px;font-size:10px;border-bottom:1px solid #000;padding-bottom:2px;margin-bottom:3px;text-transform:uppercase}
+  .srv-row{display:grid;grid-template-columns:14mm 1fr 15mm;gap:2px;font-size:11px;padding:2px 0;border-bottom:1px dotted #999;overflow-wrap:anywhere}
   .srv-row .v{text-align:right}
   .srv-head .v{text-align:right}
   @media print{body{padding:0;max-width:none}button{display:none}}
