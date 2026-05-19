@@ -7,7 +7,7 @@ const HORARIO_TALLER={0:[],1:[[600,720],[780,1140]],2:[[600,720],[780,1140]],3:[
 const DURACION_MIN={'Mantenimiento':180,'Mantenimiento ruta/MTB':180,'Mantenimiento ebike':240,'Mantenimiento suspensión':180,'Lavada':20,'Alistada':90,'Encerar cadena':30,'Parchada':30,'Cambio de llanta':30,'Cambio de neumático':30,'Armada':120,'Desarmada':90};
 
 // Estado en memoria (cache, se sincroniza con Supabase)
-let state = { clientes: [], ordenes: [], mecanicos: ['Carlos','Andrés','Juan'], nextId: 1001 };
+let state = { clientes: [], ordenes: [], mecanicos: ['Carlos','Andrés','Juan'], nextId: 1001, consignaciones: [] };
 let selectedTipos=[], currentView='asesor', mecFilter='pending', clienteActivo=null, biciActiva=null;
 let fotosIngreso=[];
 
@@ -139,16 +139,18 @@ async function gestionarMecanicos(){
 // ===== Navegación =====
 function showView(v){
   currentView=v;
-  const views=['asesor','mecanico','caja','historial','notif'];
+  const views=['asesor','mecanico','caja','historial','consignacion','notif'];
   views.forEach(x=>document.getElementById('view-'+x).style.display=x===v?'block':'none');
   document.querySelectorAll('.nav-btn').forEach((b,i)=>b.classList.toggle('active',views[i]===v));
-  if(v==='mecanico')renderMecanico();if(v==='historial')renderHistorial();if(v==='notif')renderNotif();if(v==='asesor')renderOrdenesRecientes();if(v==='caja')renderCaja();
+  if(v==='mecanico')renderMecanico();if(v==='historial')renderHistorial();if(v==='notif')renderNotif();if(v==='asesor')renderOrdenesRecientes();if(v==='caja')renderCaja();if(v==='consignacion')renderConsignacion();
   updateBadges();
 }
 function updateBadges(){
   const pend=state.ordenes.filter(o=>o.status==='pending').length;
   const mb=document.getElementById('mec-badge');if(mb){mb.textContent=pend;mb.style.display=pend>0?'':'none'}
   const al=getAlertas().length;const nb=document.getElementById('notif-badge');if(nb){nb.textContent=al;nb.style.display=al>0?'':'none'}
+  const disp=(state.consignaciones||[]).filter(c=>c.status==='disponible').length;
+  const cb=document.getElementById('cons-badge');if(cb){cb.textContent=disp;cb.style.display=disp>0?'':'none'}
 }
 async function refrescarVista(){
   await reloadState();
@@ -157,6 +159,7 @@ async function refrescarVista(){
   if(currentView==='historial')renderHistorial();
   if(currentView==='asesor')renderOrdenesRecientes();
   if(currentView==='notif')renderNotif();
+  if(currentView==='consignacion')renderConsignacion();
   updateBadges();
 }
 
@@ -599,6 +602,164 @@ function exportarCajaCSV(){
   rows.push(['','','','','','','','','','TOTAL',total,'']);
   const csv='\ufeff'+[headers,...rows].map(r=>r.map(csvEscape).join(',')).join('\r\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`veloce-caja-${now.toISOString().slice(0,7)}.csv`;a.click();URL.revokeObjectURL(url);toast(`${ords.length} órdenes exportadas`,'success');
+}
+
+// ===== Consignación =====
+
+let consFilter = 'disponible';
+
+const CONS_STATUS_LABEL = { disponible: 'Disponible', vendida: 'Vendida', retirada: 'Retirada' };
+const CONS_STATUS_CLASS = { disponible: 's-cons-disp', vendida: 's-cons-vend', retirada: 's-cons-ret' };
+
+function renderConsignacion(){
+  const lista = document.getElementById('cons-lista');
+  if(!lista) return;
+  const items = (state.consignaciones||[]).filter(c => consFilter==='todas' || c.status===consFilter);
+  if(!items.length){
+    lista.innerHTML='<div class="empty">No hay bicicletas '+(consFilter==='todas'?'registradas':consFilter+'s')+'</div>';
+    return;
+  }
+  lista.innerHTML = items.map(c => {
+    const fmt = n => '$ '+n.toLocaleString('es-CO');
+    const wa = c.contactoTel ? `<a href="${waLink(c.contactoTel,'Hola '+esc(c.contactoNombre)+', te contactamos por la bicicleta '+esc(c.producto)+' que dejaste en consignación en Veloce.')}" target="_blank" class="btn btn-sm wa-btn" style="text-decoration:none">WhatsApp</a>` : '';
+    const acciones = c.status==='disponible'
+      ? `<button class="btn btn-sm btn-success" onclick="cambiarStatusConsignacion(${c.id},'vendida')">Vendida</button>
+         <button class="btn btn-sm" onclick="cambiarStatusConsignacion(${c.id},'retirada')">Retirada</button>`
+      : `<button class="btn btn-sm" onclick="cambiarStatusConsignacion(${c.id},'disponible')">Disponible</button>`;
+    return `<div class="cons-card">
+      <div class="cons-card-top">
+        <div>
+          <span class="cons-producto">${esc(c.producto)}</span>
+          <span class="status ${CONS_STATUS_CLASS[c.status]||'s-pending'}" style="margin-left:6px">${CONS_STATUS_LABEL[c.status]||c.status}</span>
+        </div>
+        <span class="cons-precio">${fmt(c.precio)}</span>
+      </div>
+      <div class="cons-tags">
+        <span class="cons-tag">${esc(c.tipo)}</span>
+        <span class="cons-tag">Talla ${esc(c.talla)}</span>
+        <span class="cons-tag">${esc(c.color)}</span>
+      </div>
+      <div class="cons-contacto">
+        <span>👤 ${esc(c.contactoNombre)}</span>
+        <span>📞 ${esc(c.contactoTel)}</span>
+      </div>
+      ${c.notas ? `<div class="cons-notas">${esc(c.notas)}</div>` : ''}
+      <div class="cons-actions">
+        ${acciones}
+        ${wa}
+        <button class="btn btn-sm" onclick="editarConsignacion(${c.id})">Editar</button>
+        <button class="btn btn-sm" style="color:#c0392b" onclick="eliminarConsignacion(${c.id})">Eliminar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filtrarConsignacion(f){
+  consFilter = f;
+  document.querySelectorAll('#cons-tabs .tab').forEach((t,i)=>{
+    t.classList.toggle('active',['disponible','vendida','retirada','todas'][i]===f);
+  });
+  renderConsignacion();
+}
+
+function abrirFormConsignacion(id){
+  const modal = document.getElementById('modal-consignacion');
+  const titulo = document.getElementById('cons-modal-titulo');
+  document.getElementById('cons-edit-id').value = '';
+  document.getElementById('cons-producto').value = '';
+  document.getElementById('cons-tipo').value = 'MTB';
+  document.getElementById('cons-talla').value = 'M';
+  document.getElementById('cons-color').value = '';
+  document.getElementById('cons-precio').value = '';
+  document.getElementById('cons-contacto-nombre').value = '';
+  document.getElementById('cons-contacto-tel').value = '';
+  document.getElementById('cons-notas').value = '';
+  const msg = document.getElementById('cons-modal-msg');
+  msg.style.display='none';
+
+  if(id){
+    const c = (state.consignaciones||[]).find(x=>x.id===id);
+    if(!c) return;
+    titulo.textContent = 'Editar consignación';
+    document.getElementById('cons-edit-id').value = c.id;
+    document.getElementById('cons-producto').value = c.producto;
+    document.getElementById('cons-tipo').value = c.tipo;
+    document.getElementById('cons-talla').value = c.talla;
+    document.getElementById('cons-color').value = c.color;
+    document.getElementById('cons-precio').value = c.precio;
+    document.getElementById('cons-contacto-nombre').value = c.contactoNombre;
+    document.getElementById('cons-contacto-tel').value = c.contactoTel;
+    document.getElementById('cons-notas').value = c.notas;
+  } else {
+    titulo.textContent = 'Agregar consignación';
+  }
+  modal.style.display = 'flex';
+}
+
+function cerrarModalConsignacion(){
+  document.getElementById('modal-consignacion').style.display='none';
+}
+
+async function guardarConsignacion(){
+  const editId = document.getElementById('cons-edit-id').value;
+  const producto = document.getElementById('cons-producto').value.trim();
+  const tipo = document.getElementById('cons-tipo').value;
+  const talla = document.getElementById('cons-talla').value;
+  const color = document.getElementById('cons-color').value.trim();
+  const precio = parseFloat(document.getElementById('cons-precio').value) || 0;
+  const contactoNombre = document.getElementById('cons-contacto-nombre').value.trim();
+  const contactoTel = document.getElementById('cons-contacto-tel').value.trim();
+  const notas = document.getElementById('cons-notas').value.trim();
+  const msg = document.getElementById('cons-modal-msg');
+
+  if(!producto){msg.textContent='El producto es obligatorio.';msg.style.cssText='display:block;background:#FCEBEB;color:#501313;padding:8px 12px;border-radius:8px;font-size:13px;margin-top:8px';return}
+  if(!contactoNombre){msg.textContent='El nombre del propietario es obligatorio.';msg.style.cssText='display:block;background:#FCEBEB;color:#501313;padding:8px 12px;border-radius:8px;font-size:13px;margin-top:8px';return}
+  if(!contactoTel){msg.textContent='El teléfono es obligatorio.';msg.style.cssText='display:block;background:#FCEBEB;color:#501313;padding:8px 12px;border-radius:8px;font-size:13px;margin-top:8px';return}
+
+  const btn = document.getElementById('cons-save-btn');
+  btn.disabled=true;btn.textContent='Guardando...';
+  try {
+    const data = {producto,tipo,talla,color,precio,contactoNombre,contactoTel,notas};
+    if(editId){
+      await window.db.updateConsignacion(parseInt(editId), data);
+      toast('Consignación actualizada','success');
+    } else {
+      await window.db.createConsignacion(data);
+      toast('Consignación registrada','success');
+    }
+    cerrarModalConsignacion();
+    await reloadState();
+    renderConsignacion();
+    updateBadges();
+  } catch(err){
+    msg.textContent='Error: '+err.message;
+    msg.style.cssText='display:block;background:#FCEBEB;color:#501313;padding:8px 12px;border-radius:8px;font-size:13px;margin-top:8px';
+  } finally {
+    btn.disabled=false;btn.textContent='Guardar';
+  }
+}
+
+function editarConsignacion(id){ abrirFormConsignacion(id); }
+
+async function cambiarStatusConsignacion(id, nuevoStatus){
+  try {
+    await window.db.updateConsignacion(id, {status: nuevoStatus});
+    await reloadState();
+    renderConsignacion();
+    updateBadges();
+    toast('Estado actualizado','success');
+  } catch(err){ toast('Error: '+err.message,'error'); }
+}
+
+async function eliminarConsignacion(id){
+  if(!confirm('¿Eliminar esta consignación?')) return;
+  try {
+    await window.db.deleteConsignacion(id);
+    await reloadState();
+    renderConsignacion();
+    updateBadges();
+    toast('Consignación eliminada');
+  } catch(err){ toast('Error: '+err.message,'error'); }
 }
 
 // ===== PWA =====

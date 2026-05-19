@@ -58,6 +58,7 @@
   <button class="nav-btn" onclick="showView('mecanico')">Mecánico <span class="badge" id="mec-badge" style="display:none">0</span></button>
   <button class="nav-btn" onclick="showView('caja')">Caja</button>
   <button class="nav-btn" onclick="showView('historial')">Historial</button>
+  <button class="nav-btn" onclick="showView('consignacion')">Consig. <span class="badge" id="cons-badge" style="display:none">0</span></button>
   <button class="nav-btn" onclick="showView('notif')">Alertas <span class="badge" id="notif-badge" style="display:none">0</span></button>
 </div>
 
@@ -150,6 +151,21 @@
 </div>
 
 <div id="view-caja" style="display:none"><div id="caja-contenido"></div></div>
+<div id="view-consignacion" style="display:none">
+  <div class="card">
+    <div class="card-header">
+      <h2>Bicicletas en consignación</h2>
+      <button class="btn btn-primary btn-sm" onclick="abrirFormConsignacion()">+ Agregar</button>
+    </div>
+    <div class="tabs" id="cons-tabs">
+      <button class="tab active" onclick="filtrarConsignacion('disponible')">Disponibles</button>
+      <button class="tab" onclick="filtrarConsignacion('vendida')">Vendidas</button>
+      <button class="tab" onclick="filtrarConsignacion('retirada')">Retiradas</button>
+      <button class="tab" onclick="filtrarConsignacion('todas')">Todas</button>
+    </div>
+    <div id="cons-lista"></div>
+  </div>
+</div>
 <div id="view-notif" style="display:none"><div id="alertas-lista"></div></div>
 
 <div class="modal-wrap" id="modal-orden">
@@ -191,6 +207,78 @@
     </div>
   </div>
 </div>
+<!-- Modal consignación -->
+<div class="modal-wrap" id="modal-consignacion">
+  <div class="modal-inner" style="max-width:480px">
+    <div class="card-header">
+      <h2 id="cons-modal-titulo">Agregar consignación</h2>
+      <button class="btn btn-sm" onclick="cerrarModalConsignacion()">✕ Cerrar</button>
+    </div>
+    <input type="hidden" id="cons-edit-id">
+    <div class="grid2" style="margin-top:12px">
+      <div class="section" style="grid-column:1/-1">
+        <label>Producto / descripción de la bicicleta</label>
+        <input id="cons-producto" type="text" placeholder="Ej: Trek Marlin 7 2023">
+      </div>
+      <div class="section">
+        <label>Tipo</label>
+        <select id="cons-tipo">
+          <option value="MTB">MTB</option>
+          <option value="Ruta">Ruta</option>
+          <option value="Gravel">Gravel</option>
+          <option value="Urbana">Urbana</option>
+          <option value="Eléctrica">Eléctrica</option>
+          <option value="BMX">BMX</option>
+          <option value="Infantil">Infantil</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      <div class="section">
+        <label>Talla</label>
+        <select id="cons-talla">
+          <option value="XS">XS</option>
+          <option value="S">S</option>
+          <option value="M" selected>M</option>
+          <option value="L">L</option>
+          <option value="XL">XL</option>
+          <option value="XXL">XXL</option>
+          <option value='24"'>24"</option>
+          <option value='26"'>26"</option>
+          <option value='27.5"'>27.5"</option>
+          <option value='29"'>29"</option>
+          <option value="Única">Única</option>
+          <option value="Otra">Otra</option>
+        </select>
+      </div>
+      <div class="section">
+        <label>Color</label>
+        <input id="cons-color" type="text" placeholder="Ej: Negro mate">
+      </div>
+      <div class="section">
+        <label>Precio de venta ($)</label>
+        <input id="cons-precio" type="number" min="0" step="1000" placeholder="0">
+      </div>
+      <div class="section">
+        <label>Nombre del propietario</label>
+        <input id="cons-contacto-nombre" type="text" placeholder="Nombre completo">
+      </div>
+      <div class="section">
+        <label>Teléfono / WhatsApp</label>
+        <input id="cons-contacto-tel" type="text" placeholder="3001234567">
+      </div>
+      <div class="section" style="grid-column:1/-1">
+        <label>Notas <span style="color:#aaa;font-size:11px">(opcional)</span></label>
+        <textarea id="cons-notas" placeholder="Estado de la bici, accesorios incluidos..."></textarea>
+      </div>
+    </div>
+    <div id="cons-modal-msg" style="display:none;margin-top:8px;font-size:13px;padding:8px 12px;border-radius:8px"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn" onclick="cerrarModalConsignacion()" style="flex:1">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarConsignacion()" style="flex:2" id="cons-save-btn">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-wrap" id="toast-wrap"></div>
 <div class="lightbox" id="lightbox" onclick="this.style.display='none'"><img id="lightbox-img" src=""></div>
 </div>

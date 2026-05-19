@@ -99,6 +99,25 @@ create policy "auth_delete_fotos"
   on storage.objects for delete to authenticated
   using (bucket_id = 'fotos');
 
+-- Bicicletas en consignación
+create table consignaciones (
+  id bigserial primary key,
+  producto text not null,
+  tipo text not null default 'Otro',
+  talla text not null default 'Otra',
+  color text not null default '',
+  precio numeric(10,2) not null default 0,
+  contacto_nombre text not null,
+  contacto_tel text not null,
+  notas text default '',
+  status text default 'disponible',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table consignaciones enable row level security;
+create policy "auth_all_consignaciones" on consignaciones for all to authenticated using (true) with check (true);
+
 -- ============================================
 -- ✓ Listo. Siguiente paso: crear bucket "fotos" en Storage
 -- ============================================

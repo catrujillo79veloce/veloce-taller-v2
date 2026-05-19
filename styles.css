@@ -96,3 +96,15 @@ textarea{resize:vertical;min-height:60px}
 .search-result:hover{background:#f5f5f5}
 .search-result .meta{font-size:11px;color:#888;margin-top:2px}
 .search-result-type{display:inline-block;font-size:10px;padding:1px 6px;border-radius:10px;background:#f5f5f5;color:#888;margin-right:6px;text-transform:uppercase;letter-spacing:.5px}
+.s-cons-disp{background:#EAF3DE;color:#27500A}
+.s-cons-vend{background:#F1EFE8;color:#444}
+.s-cons-ret{background:#FAEEDA;color:#633806}
+.cons-card{border:0.5px solid #e0e0e0;border-radius:10px;padding:12px;margin-bottom:10px;background:#fff}
+.cons-card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.cons-producto{font-size:14px;font-weight:500}
+.cons-precio{font-size:16px;font-weight:600;color:#1D9E75;white-space:nowrap;margin-left:8px}
+.cons-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.cons-tag{font-size:11px;background:#f5f5f5;border:0.5px solid #e0e0e0;border-radius:20px;padding:2px 8px;color:#555}
+.cons-contacto{display:flex;gap:16px;font-size:12px;color:#555;margin-bottom:6px;flex-wrap:wrap}
+.cons-notas{font-size:12px;color:#888;font-style:italic;margin-bottom:6px;padding:6px 8px;background:#f9f9f9;border-radius:6px}
+.cons-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}

@@ -80,18 +80,38 @@ function adaptOrden(row, cliente, bici, repuestos, checklist){
   };
 }
 
+// ===== Adaptadores: consignaciones =====
+
+function adaptConsignacion(row){
+  if(!row) return null;
+  return {
+    id: row.id,
+    producto: row.producto || '',
+    tipo: row.tipo || '',
+    talla: row.talla || '',
+    color: row.color || '',
+    precio: parseFloat(row.precio) || 0,
+    contactoNombre: row.contacto_nombre || '',
+    contactoTel: row.contacto_tel || '',
+    notas: row.notas || '',
+    status: row.status || 'disponible',
+    creado: row.created_at
+  };
+}
+
 // ===== Cargar todo =====
 
 async function dbLoadAll(){
-  const [clRes, bcRes, ordRes, rpRes, chkRes, setRes] = await Promise.all([
+  const [clRes, bcRes, ordRes, rpRes, chkRes, setRes, consRes] = await Promise.all([
     sb.from('clientes').select('*'),
     sb.from('bicicletas').select('*'),
     sb.from('ordenes').select('*').order('created_at', { ascending: false }),
     sb.from('repuestos').select('*'),
     sb.from('checklist').select('*'),
-    sb.from('settings').select('*').eq('key', 'mecanicos').maybeSingle()
+    sb.from('settings').select('*').eq('key', 'mecanicos').maybeSingle(),
+    sb.from('consignaciones').select('*').order('created_at', { ascending: false })
   ]);
-  const errors = [clRes.error, bcRes.error, ordRes.error, rpRes.error, chkRes.error, setRes.error].filter(Boolean);
+  const errors = [clRes.error, bcRes.error, ordRes.error, rpRes.error, chkRes.error, setRes.error, consRes.error].filter(Boolean);
   if(errors.length) throw new Error('Error cargando datos: ' + errors.map(e => e.message).join('; '));
 
   const cliByUuid = new Map((clRes.data||[]).map(c => [c.id, c]));
@@ -119,8 +139,9 @@ async function dbLoadAll(){
   ));
   const mecanicos = (setRes.data && setRes.data.value) || ['Carlos','Andrés','Juan'];
   const nextId = ordenes.reduce((m,o)=>Math.max(m,o.id),1000) + 1;
+  const consignaciones = (consRes.data||[]).map(adaptConsignacion);
 
-  return { clientes, ordenes, mecanicos, nextId };
+  return { clientes, ordenes, mecanicos, nextId, consignaciones };
 }
 
 // ===== Clientes =====
@@ -311,6 +332,44 @@ async function dbDeleteFoto(url){
   await sb.storage.from('fotos').remove([m[1]]);
 }
 
+// ===== Consignaciones =====
+
+async function dbCreateConsignacion(data){
+  const { data: row, error } = await sb.from('consignaciones').insert({
+    producto: data.producto,
+    tipo: data.tipo,
+    talla: data.talla,
+    color: data.color || '',
+    precio: parseFloat(data.precio) || 0,
+    contacto_nombre: data.contactoNombre,
+    contacto_tel: data.contactoTel,
+    notas: data.notas || '',
+    status: 'disponible'
+  }).select().single();
+  if(error) throw error;
+  return adaptConsignacion(row);
+}
+
+async function dbUpdateConsignacion(id, patches){
+  const dbPatch = { updated_at: new Date().toISOString() };
+  if(patches.producto !== undefined) dbPatch.producto = patches.producto;
+  if(patches.tipo !== undefined) dbPatch.tipo = patches.tipo;
+  if(patches.talla !== undefined) dbPatch.talla = patches.talla;
+  if(patches.color !== undefined) dbPatch.color = patches.color;
+  if(patches.precio !== undefined) dbPatch.precio = parseFloat(patches.precio) || 0;
+  if(patches.contactoNombre !== undefined) dbPatch.contacto_nombre = patches.contactoNombre;
+  if(patches.contactoTel !== undefined) dbPatch.contacto_tel = patches.contactoTel;
+  if(patches.notas !== undefined) dbPatch.notas = patches.notas;
+  if(patches.status !== undefined) dbPatch.status = patches.status;
+  const { error } = await sb.from('consignaciones').update(dbPatch).eq('id', id);
+  if(error) throw error;
+}
+
+async function dbDeleteConsignacion(id){
+  const { error } = await sb.from('consignaciones').delete().eq('id', id);
+  if(error) throw error;
+}
+
 // Expose globally for app.js
 window.db = {
   loadAll: dbLoadAll,
@@ -328,5 +387,8 @@ window.db = {
   setMecanicos: dbSetMecanicos,
   uploadFoto: dbUploadFoto,
   deleteFoto: dbDeleteFoto,
+  createConsignacion: dbCreateConsignacion,
+  updateConsignacion: dbUpdateConsignacion,
+  deleteConsignacion: dbDeleteConsignacion,
   sb
 };
