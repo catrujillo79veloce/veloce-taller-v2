@@ -610,17 +610,38 @@ let consFilter = 'disponible';
 
 const CONS_STATUS_LABEL = { disponible: 'Disponible', vendida: 'Vendida', retirada: 'Retirada' };
 const CONS_STATUS_CLASS = { disponible: 's-cons-disp', vendida: 's-cons-vend', retirada: 's-cons-ret' };
+const COMISION_PCT = 0.08; // 8% taller
+
+function calcComision(precio){
+  const p = parseFloat(precio) || 0;
+  const comision = Math.round(p * COMISION_PCT);
+  const propietario = p - comision;
+  return { precio: p, comision, propietario };
+}
 
 function renderConsignacion(){
   const lista = document.getElementById('cons-lista');
   if(!lista) return;
+  const fmt = n => '$ '+n.toLocaleString('es-CO');
   const items = (state.consignaciones||[]).filter(c => consFilter==='todas' || c.status===consFilter);
+
+  // Resumen totales del filtro actual
+  const totVentas = items.reduce((s,c)=>s+(parseFloat(c.precio)||0),0);
+  const totComision = items.reduce((s,c)=>s+calcComision(c.precio).comision,0);
+  const totPropietario = totVentas - totComision;
+  const resumen = items.length ? `<div class="cons-resumen">
+    <div><span class="cons-resumen-lbl">${items.length} bici(s) · ${CONS_STATUS_LABEL[consFilter]||'Todas'}</span></div>
+    <div class="cons-resumen-row"><span>Total ventas</span><strong>${fmt(totVentas)}</strong></div>
+    <div class="cons-resumen-row"><span>Comisión taller (8%)</span><strong style="color:#1D9E75">${fmt(totComision)}</strong></div>
+    <div class="cons-resumen-row"><span>A propietarios (92%)</span><strong>${fmt(totPropietario)}</strong></div>
+  </div>` : '';
+
   if(!items.length){
     lista.innerHTML='<div class="empty">No hay bicicletas '+(consFilter==='todas'?'registradas':consFilter+'s')+'</div>';
     return;
   }
-  lista.innerHTML = items.map(c => {
-    const fmt = n => '$ '+n.toLocaleString('es-CO');
+  lista.innerHTML = resumen + items.map(c => {
+    const calc = calcComision(c.precio);
     const wa = c.contactoTel ? `<a href="${waLink(c.contactoTel,'Hola '+esc(c.contactoNombre)+', te contactamos por la bicicleta '+esc(c.producto)+' que dejaste en consignación en Veloce.')}" target="_blank" class="btn btn-sm wa-btn" style="text-decoration:none">WhatsApp</a>` : '';
     const acciones = c.status==='disponible'
       ? `<button class="btn btn-sm btn-success" onclick="cambiarStatusConsignacion(${c.id},'vendida')">Vendida</button>
@@ -632,12 +653,16 @@ function renderConsignacion(){
           <span class="cons-producto">${esc(c.producto)}</span>
           <span class="status ${CONS_STATUS_CLASS[c.status]||'s-pending'}" style="margin-left:6px">${CONS_STATUS_LABEL[c.status]||c.status}</span>
         </div>
-        <span class="cons-precio">${fmt(c.precio)}</span>
+        <span class="cons-precio">${fmt(calc.precio)}</span>
       </div>
       <div class="cons-tags">
         <span class="cons-tag">${esc(c.tipo)}</span>
         <span class="cons-tag">Talla ${esc(c.talla)}</span>
         <span class="cons-tag">${esc(c.color)}</span>
+      </div>
+      <div class="cons-comision">
+        <div><span>Comisión taller (8%)</span><strong style="color:#1D9E75">${fmt(calc.comision)}</strong></div>
+        <div><span>Recibe propietario</span><strong>${fmt(calc.propietario)}</strong></div>
       </div>
       <div class="cons-contacto">
         <span>👤 ${esc(c.contactoNombre)}</span>
@@ -652,6 +677,18 @@ function renderConsignacion(){
       </div>
     </div>`;
   }).join('');
+}
+
+function actualizarComisionPreview(){
+  const precio = parseFloat(document.getElementById('cons-precio').value) || 0;
+  const calc = calcComision(precio);
+  const prev = document.getElementById('cons-comision-preview');
+  if(!prev) return;
+  const fmt = n => '$ '+n.toLocaleString('es-CO');
+  if(precio <= 0){ prev.style.display='none'; return; }
+  prev.style.display='block';
+  prev.innerHTML = `<div><span>Comisión taller (8%)</span><strong style="color:#1D9E75">${fmt(calc.comision)}</strong></div>
+                    <div><span>Recibe el propietario</span><strong>${fmt(calc.propietario)}</strong></div>`;
 }
 
 function filtrarConsignacion(f){
@@ -693,6 +730,7 @@ function abrirFormConsignacion(id){
   } else {
     titulo.textContent = 'Agregar consignación';
   }
+  actualizarComisionPreview();
   modal.style.display = 'flex';
 }
 

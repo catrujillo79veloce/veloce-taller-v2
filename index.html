@@ -256,7 +256,8 @@
       </div>
       <div class="section">
         <label>Precio de venta ($)</label>
-        <input id="cons-precio" type="number" min="0" step="1000" placeholder="0">
+        <input id="cons-precio" type="number" min="0" step="1000" placeholder="0" oninput="actualizarComisionPreview()">
+        <div id="cons-comision-preview" class="cons-comision-preview" style="display:none"></div>
       </div>
       <div class="section">
         <label>Nombre del propietario</label>
