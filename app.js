@@ -523,28 +523,33 @@ function irACliente(cid){document.getElementById('search-results').style.display
 function imprimirRecibo(oid){
   const o=state.ordenes.find(o=>o.id===oid);if(!o)return;
   const reps=o.reparaciones||[];const total=reps.reduce((s,r)=>s+(parseFloat(r.precio)||0),0);
-  const w=window.open('','_blank','width=600,height=800');if(!w){toast('Habilita popups para imprimir','error');return}
+  const w=window.open('','_blank','width=380,height=800');if(!w){toast('Habilita popups para imprimir','error');return}
   const logoUrl = location.origin + location.pathname.replace(/[^/]*$/,'') + 'logo.png';
+  const reps2 = reps.filter(r => r.desc || r.codigo || r.precio);
   const html=`<!DOCTYPE html><html><head><title>Recibo orden #${o.id}</title><style>
-  *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,sans-serif}
-  body{padding:24px;color:#111;max-width:500px;margin:0 auto;font-size:13px}
-  .logo{text-align:center;border-bottom:2px solid #111;padding-bottom:12px;margin-bottom:16px}
-  .logo img{max-width:240px;height:auto;display:block;margin:0 auto 6px}
-  .logo p{font-size:11px;color:#888;margin-top:2px;letter-spacing:.5px}
-  .row{display:flex;justify-content:space-between;margin-bottom:6px}
-  .row strong{min-width:100px;display:inline-block}
-  h2{font-size:14px;margin:14px 0 6px;padding-bottom:4px;border-bottom:0.5px solid #ccc}
-  .box{background:#f5f5f5;padding:10px;border-radius:6px;margin-bottom:10px;font-size:12px}
-  .total{display:flex;justify-content:space-between;font-size:16px;font-weight:600;border-top:1px solid #111;padding-top:8px;margin-top:8px}
-  .footer{text-align:center;margin-top:20px;padding-top:12px;border-top:0.5px dashed #999;font-size:11px;color:#666}
-  .orden-num{text-align:center;font-size:18px;font-weight:600;margin:8px 0;background:#FAECE7;padding:8px;border-radius:6px;color:#4A1B0C}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Arial Black','Helvetica',sans-serif;font-weight:700;color:#000}
+  @page{size:80mm auto;margin:3mm}
+  body{padding:4mm;color:#000;max-width:72mm;margin:0 auto;font-size:11px;line-height:1.35}
+  .logo{text-align:center;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}
+  .logo img{max-width:55mm;height:auto;display:block;margin:0 auto 4px}
+  .logo p{font-size:10px;margin-top:2px;letter-spacing:.5px}
+  .row{display:flex;justify-content:space-between;margin-bottom:3px;gap:6px}
+  .row strong{min-width:55px;display:inline-block}
+  h2{font-size:12px;margin:8px 0 4px;padding-bottom:2px;border-bottom:1px solid #000;text-transform:uppercase;letter-spacing:.5px}
+  .box{padding:4px 0;margin-bottom:6px;font-size:11px}
+  .total{display:flex;justify-content:space-between;font-size:14px;border-top:2px solid #000;padding-top:6px;margin-top:6px}
+  .footer{text-align:center;margin-top:14px;padding-top:8px;border-top:1px dashed #000;font-size:10px}
+  .orden-num{text-align:center;font-size:14px;margin:6px 0;border:2px solid #000;padding:5px;text-transform:uppercase;letter-spacing:.5px}
+  .srv-head{display:grid;grid-template-columns:18mm 1fr 18mm;gap:3px;font-size:10px;border-bottom:1px solid #000;padding-bottom:2px;margin-bottom:3px;text-transform:uppercase}
+  .srv-row{display:grid;grid-template-columns:18mm 1fr 18mm;gap:3px;font-size:11px;padding:2px 0;border-bottom:1px dotted #999}
+  .srv-row .v{text-align:right}
+  .srv-head .v{text-align:right}
   @media print{body{padding:0;max-width:none}button{display:none}}
-  .noprint{text-align:center;margin-top:16px}
-  .btn-print{background:#D85A30;color:#fff;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;margin:0 4px}
+  .noprint{text-align:center;margin-top:14px}
+  .btn-print{background:#111;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700;margin:0 3px;font-family:sans-serif}
   </style></head><body>
   <div class="logo"><img src="${logoUrl}" alt="Veloce"><p>TALLER ESPECIALIZADO · MEDELLÍN</p></div>
-  <div class="orden-num">RECIBO DE INGRESO · ORDEN #${o.id}</div>
-  <div style="text-align:center;margin:10px 0"><img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent('VELOCE#'+o.id)}" alt="QR" style="width:110px;height:110px" onerror="this.style.display='none'"><div style="font-size:10px;color:#888;margin-top:4px">Código: VELOCE#${o.id}</div></div>
+  <div class="orden-num">ORDEN #${o.id}</div>
   <div class="row"><strong>Fecha:</strong><span>${new Date(o.creado).toLocaleString('es-CO')}</span></div>
   <div class="row"><strong>Prioridad:</strong><span>${esc(o.prioridad)}</span></div>
   <div class="row"><strong>Mecánico:</strong><span>${esc(o.mecanico)}</span></div>
@@ -555,10 +560,13 @@ function imprimirRecibo(oid){
   <h2>Bicicleta</h2>
   <div class="box"><div class="row"><strong>Marca:</strong><span>${esc(o.bici.marca)}</span></div><div class="row"><strong>Modelo:</strong><span>${esc(o.bici.modelo)}</span></div>${o.bici.color?`<div class="row"><strong>Color:</strong><span>${esc(o.bici.color)}</span></div>`:''}${o.bici.serie?`<div class="row"><strong>No. serie:</strong><span>${esc(o.bici.serie)}</span></div>`:''}${o.bici.año?`<div class="row"><strong>Año:</strong><span>${esc(o.bici.año)}</span></div>`:''}</div>
   <h2>Trabajo solicitado</h2>
-  <div class="box">${esc((o.tiposTrabajo||[]).join(' · '))}${o.descripcion?`<div style="margin-top:8px;padding-top:8px;border-top:0.5px solid #ccc;font-style:italic">${esc(o.descripcion)}</div>`:''}</div>
-  ${reps.length>0&&total>0?`<h2>Servicios realizados</h2><div class="box">${reps.filter(r=>r.desc).map(r=>`<div class="row"><span>${esc(r.desc)}</span><span>$ ${(parseFloat(r.precio)||0).toLocaleString('es-CO')}</span></div>`).join('')}<div class="total"><span>TOTAL</span><span>$ ${total.toLocaleString('es-CO')}</span></div></div>`:''}
-  <div class="footer">Conserve este recibo para retirar su bicicleta.<br>Gracias por confiar en Veloce Bicicletas 🚴</div>
-  <div class="noprint"><button class="btn-print" onclick="window.print()">🖨 Imprimir</button><button class="btn-print" style="background:#888" onclick="window.close()">Cerrar</button></div>
+  <div class="box">${esc((o.tiposTrabajo||[]).join(' · '))}${o.descripcion?`<div style="margin-top:4px;padding-top:4px;border-top:1px dotted #999">${esc(o.descripcion)}</div>`:''}</div>
+  ${reps2.length>0?`<h2>Servicios / Repuestos</h2>
+  <div class="srv-head"><span>SKU</span><span>Producto</span><span class="v">Valor</span></div>
+  ${reps2.map(r=>`<div class="srv-row"><span>${esc(r.codigo||'-')}</span><span>${esc(r.desc||'')}</span><span class="v">$ ${(parseFloat(r.precio)||0).toLocaleString('es-CO')}</span></div>`).join('')}
+  <div class="total"><span>TOTAL</span><span>$ ${total.toLocaleString('es-CO')}</span></div>`:''}
+  <div class="footer">Conserve este recibo<br>para retirar su bicicleta.<br><br>Gracias por confiar en<br>VELOCE BICICLETAS</div>
+  <div class="noprint"><button class="btn-print" onclick="window.print()">Imprimir</button><button class="btn-print" style="background:#666" onclick="window.close()">Cerrar</button></div>
   </body></html>`;
   w.document.write(html);w.document.close();setTimeout(()=>w.print(),400);
 }
