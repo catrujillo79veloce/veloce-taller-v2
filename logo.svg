@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 140" fill="none">
+  <!-- Bicycle -->
+  <g stroke="#111" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <circle cx="42" cy="92" r="32"/>
+    <circle cx="148" cy="92" r="32"/>
+    <path d="M 42 92 L 82 50 L 118 92 L 42 92 Z"/>
+    <path d="M 82 50 L 105 50"/>
+    <path d="M 118 92 L 148 92"/>
+    <path d="M 105 50 L 118 92"/>
+    <path d="M 75 47 L 92 47" stroke-width="6"/>
+    <path d="M 82 50 L 82 47"/>
+    <path d="M 148 92 L 132 48"/>
+    <path d="M 122 46 L 145 46"/>
+    <path d="M 145 46 Q 152 46 152 54 L 152 60"/>
+  </g>
+
+  <!-- Italian flag stripes above VELOCE -->
+  <rect x="218" y="22" width="42" height="6" fill="#1B7B2C"/>
+  <rect x="264" y="22" width="42" height="6" fill="#111" opacity="0.15"/>
+  <rect x="310" y="22" width="42" height="6" fill="#CE1126"/>
+
+  <!-- VELOCE text -->
+  <text x="218" y="105" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif"
+        font-size="78" font-weight="800" fill="#111" letter-spacing="2">VELOCE</text>
+</svg>

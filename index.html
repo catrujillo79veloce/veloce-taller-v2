@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#D85A30">
 <link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+<link rel="apple-touch-icon" href="logo-icon.svg">
 <title>Veloce Taller</title>
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -14,13 +16,8 @@
 <div id="login-screen" class="login-screen" style="display:none">
   <div class="login-card">
     <div class="login-logo">
-      <svg viewBox="0 0 200 60" style="height:40px">
-        <rect x="10" y="12" width="20" height="3" rx="1.5" fill="#1B7B2C"/>
-        <rect x="32" y="12" width="20" height="3" rx="1.5" fill="#e0e0e0"/>
-        <rect x="54" y="12" width="20" height="3" rx="1.5" fill="#CE1126"/>
-        <text x="10" y="44" font-family="system-ui,sans-serif" font-size="24" font-weight="800" fill="#D85A30" letter-spacing="1">VELOCE</text>
-      </svg>
-      <p style="font-size:11px;color:#888;margin-top:2px">Gestión de Taller</p>
+      <img src="logo.svg" alt="Veloce" class="brand-logo" style="height:54px;color:#111">
+      <p style="font-size:11px;color:#888;margin-top:6px;letter-spacing:.5px">GESTIÓN DE TALLER</p>
     </div>
     <form id="login-form" onsubmit="handleLogin(event)">
       <div class="section">
@@ -49,8 +46,9 @@
   <input type="text" id="global-search" placeholder="🔍 Buscar orden #, cliente, bicicleta..." oninput="busquedaGlobal(this.value)" onblur="setTimeout(()=>document.getElementById('search-results').style.display='none',200)" onfocus="if(this.value)document.getElementById('search-results').style.display='block'">
   <div class="search-results" id="search-results"></div>
 </div>
-<div class="header-actions">
-  <span class="meta" id="user-email" style="margin-right:auto;align-self:center;font-size:11px"></span>
+<div class="app-header">
+  <img src="logo.svg" alt="Veloce" class="app-header-logo">
+  <span class="meta" id="user-email"></span>
   <button class="btn btn-sm" onclick="handleLogout()">Salir</button>
 </div>
 <div class="nav">
