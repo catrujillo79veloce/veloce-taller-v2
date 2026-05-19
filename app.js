@@ -524,12 +524,13 @@ function imprimirRecibo(oid){
   const o=state.ordenes.find(o=>o.id===oid);if(!o)return;
   const reps=o.reparaciones||[];const total=reps.reduce((s,r)=>s+(parseFloat(r.precio)||0),0);
   const w=window.open('','_blank','width=600,height=800');if(!w){toast('Habilita popups para imprimir','error');return}
+  const logoUrl = location.origin + location.pathname.replace(/[^/]*$/,'') + 'logo.png';
   const html=`<!DOCTYPE html><html><head><title>Recibo orden #${o.id}</title><style>
   *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,sans-serif}
   body{padding:24px;color:#111;max-width:500px;margin:0 auto;font-size:13px}
-  .logo{text-align:center;border-bottom:2px solid #D85A30;padding-bottom:12px;margin-bottom:16px}
-  .logo h1{font-size:22px;color:#D85A30;letter-spacing:1px}
-  .logo p{font-size:11px;color:#888;margin-top:2px}
+  .logo{text-align:center;border-bottom:2px solid #111;padding-bottom:12px;margin-bottom:16px}
+  .logo img{max-width:240px;height:auto;display:block;margin:0 auto 6px}
+  .logo p{font-size:11px;color:#888;margin-top:2px;letter-spacing:.5px}
   .row{display:flex;justify-content:space-between;margin-bottom:6px}
   .row strong{min-width:100px;display:inline-block}
   h2{font-size:14px;margin:14px 0 6px;padding-bottom:4px;border-bottom:0.5px solid #ccc}
@@ -541,7 +542,7 @@ function imprimirRecibo(oid){
   .noprint{text-align:center;margin-top:16px}
   .btn-print{background:#D85A30;color:#fff;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;margin:0 4px}
   </style></head><body>
-  <div class="logo"><h1>VELOCE BICICLETAS</h1><p>Taller especializado · Medellín</p></div>
+  <div class="logo"><img src="${logoUrl}" alt="Veloce"><p>TALLER ESPECIALIZADO · MEDELLÍN</p></div>
   <div class="orden-num">RECIBO DE INGRESO · ORDEN #${o.id}</div>
   <div style="text-align:center;margin:10px 0"><img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent('VELOCE#'+o.id)}" alt="QR" style="width:110px;height:110px" onerror="this.style.display='none'"><div style="font-size:10px;color:#888;margin-top:4px">Código: VELOCE#${o.id}</div></div>
   <div class="row"><strong>Fecha:</strong><span>${new Date(o.creado).toLocaleString('es-CO')}</span></div>
