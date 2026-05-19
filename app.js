@@ -528,20 +528,21 @@ function imprimirRecibo(oid){
   const reps2 = reps.filter(r => r.desc || r.codigo || r.precio);
   const html=`<!DOCTYPE html><html><head><title>Recibo orden #${o.id}</title><style>
   *{box-sizing:border-box;margin:0;padding:0;font-family:'Arial Black','Helvetica',sans-serif;font-weight:700;color:#000}
-  @page{size:80mm auto;margin:3mm}
-  body{padding:4mm;color:#000;max-width:72mm;margin:0 auto;font-size:11px;line-height:1.35}
-  .logo{text-align:center;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}
-  .logo img{max-width:55mm;height:auto;display:block;margin:0 auto 4px}
-  .logo p{font-size:10px;margin-top:2px;letter-spacing:.5px}
-  .row{display:flex;justify-content:space-between;margin-bottom:3px;gap:6px}
-  .row strong{min-width:55px;display:inline-block}
-  h2{font-size:12px;margin:8px 0 4px;padding-bottom:2px;border-bottom:1px solid #000;text-transform:uppercase;letter-spacing:.5px}
-  .box{padding:4px 0;margin-bottom:6px;font-size:11px}
-  .total{display:flex;justify-content:space-between;font-size:14px;border-top:2px solid #000;padding-top:6px;margin-top:6px}
-  .footer{text-align:center;margin-top:14px;padding-top:8px;border-top:1px dashed #000;font-size:10px}
-  .orden-num{text-align:center;font-size:14px;margin:6px 0;border:2px solid #000;padding:5px;text-transform:uppercase;letter-spacing:.5px}
-  .srv-head{display:grid;grid-template-columns:18mm 1fr 18mm;gap:3px;font-size:10px;border-bottom:1px solid #000;padding-bottom:2px;margin-bottom:3px;text-transform:uppercase}
-  .srv-row{display:grid;grid-template-columns:18mm 1fr 18mm;gap:3px;font-size:11px;padding:2px 0;border-bottom:1px dotted #999}
+  @page{size:80mm auto;margin:0}
+  body{padding:2mm 3mm;color:#000;max-width:72mm;margin:0 auto;font-size:10px;line-height:1.3;word-wrap:break-word;overflow-wrap:break-word}
+  .logo{text-align:center;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:6px}
+  .logo img{max-width:48mm;height:auto;display:block;margin:0 auto 3px}
+  .logo p{font-size:9px;margin-top:2px;letter-spacing:.3px}
+  .row{display:flex;justify-content:space-between;margin-bottom:2px;gap:4px;word-break:break-word}
+  .row strong{min-width:48px;display:inline-block;flex-shrink:0}
+  .row span{text-align:right;overflow-wrap:anywhere}
+  h2{font-size:11px;margin:6px 0 3px;padding-bottom:2px;border-bottom:1px solid #000;text-transform:uppercase;letter-spacing:.3px}
+  .box{padding:3px 0;margin-bottom:5px;font-size:10px}
+  .total{display:flex;justify-content:space-between;font-size:13px;border-top:2px solid #000;padding-top:5px;margin-top:5px}
+  .footer{text-align:center;margin-top:12px;padding-top:6px;border-top:1px dashed #000;font-size:9px;line-height:1.4}
+  .orden-num{text-align:center;font-size:13px;margin:5px 0;border:2px solid #000;padding:4px;text-transform:uppercase;letter-spacing:.3px}
+  .srv-head{display:grid;grid-template-columns:15mm 1fr 16mm;gap:2px;font-size:9px;border-bottom:1px solid #000;padding-bottom:2px;margin-bottom:2px;text-transform:uppercase}
+  .srv-row{display:grid;grid-template-columns:15mm 1fr 16mm;gap:2px;font-size:10px;padding:2px 0;border-bottom:1px dotted #999;overflow-wrap:anywhere}
   .srv-row .v{text-align:right}
   .srv-head .v{text-align:right}
   @media print{body{padding:0;max-width:none}button{display:none}}
