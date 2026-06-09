@@ -150,7 +150,7 @@ function showView(v){
 function updateBadges(){
   const pend=state.ordenes.filter(o=>o.status==='pending').length;
   const mb=document.getElementById('mec-badge');if(mb){mb.textContent=pend;mb.style.display=pend>0?'':'none'}
-  const pb=document.getElementById('prog-badge');if(pb){const cP=calcularCola();const hoyD=new Date();let pt=0;state.ordenes.forEach(o=>{if(o.status==='pending'||o.status==='in-progress'){const e=cP.get(o.id);const f=e?e.fin:(o.fechaCompromiso?new Date(o.fechaCompromiso):null);if(f&&_mismoDia(f,hoyD))pt++}});pb.textContent=pt;pb.style.display=pt>0?'':'none'}
+  const pb=document.getElementById('prog-badge');if(pb){const cP=calcularCola();const hoyD=new Date();let pt=0;state.ordenes.forEach(o=>{if(o.status==='pending'||o.status==='in-progress'){const e=cP.get(o.id);const f=o.diaProgramado?new Date(o.diaProgramado+'T00:00:00'):(e?e.fin:(o.fechaCompromiso?new Date(o.fechaCompromiso):null));if(f&&_mismoDia(f,hoyD))pt++}});pb.textContent=pt;pb.style.display=pt>0?'':'none'}
   const al=getAlertas().length;const nb=document.getElementById('notif-badge');if(nb){nb.textContent=al;nb.style.display=al>0?'':'none'}
   const disp=(state.consignaciones||[]).filter(c=>c.status==='disponible').length;
   const cb=document.getElementById('cons-badge');if(cb){cb.textContent=disp;cb.style.display=disp>0?'':'none'}
@@ -320,6 +320,17 @@ function minutosDisponibles(date){
   return total;
 }
 function filtrarProgDia(key){progDiaSel=key;renderProgramacion()}
+function proximosDiasHabiles(n){const out=[];const c=new Date();c.setHours(0,0,0,0);let g=0;while(out.length<n&&g<45){g++;if((HORARIO_TALLER[c.getDay()]||[]).length)out.push(new Date(c));c.setDate(c.getDate()+1)}return out}
+function _labelDiaKey(k){const d=new Date(k+'T00:00:00');const h=new Date();h.setHours(0,0,0,0);const m=new Date(h.getTime()+86400000);return _mismoDia(d,h)?'Hoy':_mismoDia(d,m)?'Mañana':d.toLocaleDateString('es-CO',{weekday:'short',day:'2-digit',month:'short'})}
+async function setDiaProgramado(oid,val){
+  const o=state.ordenes.find(o=>o.id===oid);if(!o)return;
+  try{
+    await window.db.updateOrden(oid,{diaProgramado:val||null});
+    o.diaProgramado=val||null;
+    renderProgramacion();updateBadges();
+    toast(val?('Reprogramada a '+_labelDiaKey(val)):'Programación automática','info');
+  }catch(err){toast('Error: '+err.message,'error')}
+}
 
 async function cambiarEstadoOrden(oid,estado,opts){
   opts=opts||{};const o=state.ordenes.find(o=>o.id===oid);if(!o)return;
@@ -338,21 +349,34 @@ async function cambiarEstadoOrden(oid,estado,opts){
 
 function progCard(o,finDe){
   const fin=finDe(o);
-  const atrasada=(o.status==='pending'||o.status==='in-progress')&&fin&&fin<new Date();
+  const activa=o.status==='pending'||o.status==='in-progress';
+  const atrasada=activa&&!o.diaProgramado&&fin&&fin<new Date();
   const urg=o.prioridad==='urgente'?'<span class="kb-urg">⚡</span>':'';
   let acc='';
   if(o.status==='pending')acc=`<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();cambiarEstadoOrden(${o.id},'in-progress')">▶ Iniciar</button><button class="btn btn-sm" onclick="event.stopPropagation();cambiarEstadoOrden(${o.id},'waiting-parts')">⏸ Repuesto</button>`;
   else if(o.status==='in-progress')acc=`<button class="btn btn-sm btn-success" onclick="event.stopPropagation();cambiarEstadoOrden(${o.id},'done')">✓ Terminar</button><button class="btn btn-sm" onclick="event.stopPropagation();cambiarEstadoOrden(${o.id},'waiting-parts')">⏸ Repuesto</button>`;
   else if(o.status==='waiting-parts')acc=`<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();cambiarEstadoOrden(${o.id},'in-progress')">▶ Reanudar</button><button class="btn btn-sm" onclick="event.stopPropagation();cambiarEstadoOrden(${o.id},'pending')">↩ Pendiente</button>`;
   else if(o.status==='done')acc=`<button class="btn btn-sm" onclick="event.stopPropagation();cambiarEstadoOrden(${o.id},'delivered')">📦 Entregar</button><button class="btn btn-sm" onclick="event.stopPropagation();cambiarEstadoOrden(${o.id},'in-progress')">↩ Reabrir</button>`;
-  const horaFin=(o.status==='pending'||o.status==='in-progress')&&fin?`<div class="kb-card-meta" style="color:#185FA5">📅 ${fmtFechaHora(fin)}</div>`:'';
+  // Selector de día (solo órdenes activas)
+  let diaSel='';
+  if(activa){
+    const opts=proximosDiasHabiles(10);
+    const keys=opts.map(_localKey);
+    let inner=`<option value="">📅 Auto</option>`;
+    if(o.diaProgramado&&!keys.includes(o.diaProgramado))inner+=`<option value="${o.diaProgramado}" selected>📌 ${_labelDiaKey(o.diaProgramado)}</option>`;
+    inner+=opts.map(d=>{const k=_localKey(d);return `<option value="${k}" ${o.diaProgramado===k?'selected':''}>${_labelDiaKey(k)}</option>`}).join('');
+    diaSel=`<select class="kb-day" onclick="event.stopPropagation()" onchange="setDiaProgramado(${o.id},this.value)">${inner}</select>`;
+  }
+  const diaInfo=o.diaProgramado
+    ?`<div class="kb-card-meta kb-pin">📌 Fijada: ${_labelDiaKey(o.diaProgramado)}</div>`
+    :(activa&&fin?`<div class="kb-card-meta" style="color:#185FA5">📅 ${fmtFechaHora(fin)}</div>`:'');
   return `<div class="kb-card" onclick="abrirOrden(${o.id})">
     <div class="kb-card-title">#${o.id} ${urg}${atrasada?'<span class="kb-overdue">Atrasada</span>':''}</div>
     <div class="kb-card-meta"><strong>${esc(o.bici.marca)} ${esc(o.bici.modelo)}</strong></div>
     <div class="kb-card-meta">${esc(o.clienteNombre)}</div>
     <div class="kb-card-meta">${esc((o.tiposTrabajo||[]).join(', '))} · ${fmtDur(duracionOrden(o))}</div>
-    ${horaFin}
-    <div class="kb-actions">${acc}</div>
+    ${diaInfo}
+    <div class="kb-actions">${acc}${diaSel}</div>
   </div>`;
 }
 
@@ -363,6 +387,7 @@ function renderProgramacion(){
   const cola=calcularCola();
   const activos=state.ordenes.filter(o=>o.status==='pending'||o.status==='in-progress');
   const finDe=o=>{const e=cola.get(o.id);return e?e.fin:(o.fechaCompromiso?new Date(o.fechaCompromiso):new Date())};
+  const diaDe=o=>o.diaProgramado?new Date(o.diaProgramado+'T00:00:00'):finDe(o); // día efectivo (fijado o calculado)
 
   // Tira de días hábiles
   const dias=[];let cur=new Date(hoy);let g=0;
@@ -370,7 +395,7 @@ function renderProgramacion(){
   const mañana=new Date(hoy.getTime()+86400000);
   const diasHTML=dias.map(d=>{
     const key=_localKey(d);
-    const ords=activos.filter(o=>_mismoDia(finDe(o),d));
+    const ords=activos.filter(o=>_mismoDia(diaDe(o),d));
     const usados=ords.reduce((s,o)=>s+duracionOrden(o),0);
     const disp=minutosDisponibles(d);
     const pct=disp>0?usados/disp:(usados>0?1.5:0);
@@ -393,9 +418,9 @@ function renderProgramacion(){
   </div>`;
 
   // Kanban
-  const filtraDia=o=>progDiaSel==='todas'||_localKey(finDe(o))===progDiaSel;
-  const pend=activos.filter(o=>o.status==='pending'&&filtraDia(o)).sort((a,b)=>finDe(a)-finDe(b));
-  const prog=activos.filter(o=>o.status==='in-progress'&&filtraDia(o)).sort((a,b)=>finDe(a)-finDe(b));
+  const filtraDia=o=>progDiaSel==='todas'||_localKey(diaDe(o))===progDiaSel;
+  const pend=activos.filter(o=>o.status==='pending'&&filtraDia(o)).sort((a,b)=>diaDe(a)-diaDe(b));
+  const prog=activos.filter(o=>o.status==='in-progress'&&filtraDia(o)).sort((a,b)=>diaDe(a)-diaDe(b));
   const esper=state.ordenes.filter(o=>o.status==='waiting-parts').sort((a,b)=>new Date(b.creado)-new Date(a.creado));
   const listas=state.ordenes.filter(o=>o.status==='done').sort((a,b)=>new Date(b.creado)-new Date(a.creado));
   let ctx;

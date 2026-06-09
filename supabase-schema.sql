@@ -40,6 +40,7 @@ create table ordenes (
   prioridad text default 'normal',
   mecanico text default 'Sin asignar',
   status text default 'pending',
+  dia_programado date,
   reparaciones jsonb default '[]'::jsonb,
   notas text default '',
   fotos text[] default array[]::text[],

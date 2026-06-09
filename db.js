@@ -75,6 +75,7 @@ function adaptOrden(row, cliente, bici, repuestos, checklist){
     actualizado: row.updated_at,
     fechaTerminado: row.fecha_terminado,
     fechaCompromiso: row.fecha_compromiso,
+    diaProgramado: row.dia_programado || null,
     duracionMinutos: row.duracion_minutos,
     recordatorioEnviado: row.recordatorio_enviado
   };
@@ -251,6 +252,7 @@ async function dbUpdateOrden(oid, patches){
   if(patches.status !== undefined) dbPatch.status = patches.status;
   if(patches.fechaTerminado !== undefined) dbPatch.fecha_terminado = patches.fechaTerminado;
   if(patches.fechaCompromiso !== undefined) dbPatch.fecha_compromiso = patches.fechaCompromiso;
+  if(patches.diaProgramado !== undefined) dbPatch.dia_programado = patches.diaProgramado;
   if(patches.duracionMinutos !== undefined) dbPatch.duracion_minutos = patches.duracionMinutos;
   if(patches.recordatorioEnviado !== undefined) dbPatch.recordatorio_enviado = patches.recordatorioEnviado;
   if(patches.fotos !== undefined) dbPatch.fotos = patches.fotos;
