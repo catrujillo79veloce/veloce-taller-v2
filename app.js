@@ -379,7 +379,7 @@ function progCard(o,finDe,modo){
   const statusBadge=modo==='mecanico'?`<span class="status s-${o.status}" style="font-size:10px">${statusLabel(o.status)}</span>`:'';
   const mecSel=modo==='mecanico'?`<select class="kb-day" onclick="event.stopPropagation()" onchange="reasignarMecanico(${o.id},this.value)">${renderMecanicoOptions(o.mecanico)}</select>`:'';
   const mecInfo=modo==='estado'&&o.mecanico&&o.mecanico!=='Sin asignar'?`<div class="kb-card-meta">🔧 ${esc(o.mecanico)}</div>`:'';
-  return `<div class="kb-card" onclick="abrirOrden(${o.id})">
+  return `<div class="kb-card" data-oid="${o.id}">
     <div class="kb-card-title">#${o.id} ${urg}${statusBadge}${atrasada?'<span class="kb-overdue">Atrasada</span>':''}</div>
     <div class="kb-card-meta"><strong>${esc(o.bici.marca)} ${esc(o.bici.modelo)}</strong></div>
     <div class="kb-card-meta">${esc(o.clienteNombre)}</div>
@@ -436,7 +436,7 @@ function renderProgramacion(){
   if(progDiaSel==='todas')ctx='todos los días';
   else{const d=dias.find(x=>_localKey(x)===progDiaSel);ctx=d?(_mismoDia(d,hoy)?'hoy':d.toLocaleDateString('es-CO',{weekday:'long',day:'2-digit',month:'short'})):'el día seleccionado'}
 
-  const col=(titulo,ords,accent)=>`<div class="kb-col">
+  const col=(titulo,ords,accent,dropStatus)=>`<div class="kb-col" data-drop-status="${dropStatus}">
     <div class="kb-col-head" style="color:${accent};border-bottom:2px solid ${accent}"><span>${titulo}</span><span class="kb-col-count">${ords.length}</span></div>
     ${ords.length?ords.map(o=>progCard(o,finDe)).join(''):'<div class="kb-empty">—</div>'}
   </div>`;
@@ -456,19 +456,93 @@ function renderProgramacion(){
       const horas=ords.filter(o=>o.status!=='waiting-parts').reduce((s,o)=>s+duracionOrden(o),0);
       let cap='';
       if(progDiaSel!=='todas'){const d=dias.find(x=>_localKey(x)===progDiaSel)||new Date(progDiaSel+'T00:00:00');const disp=minutosDisponibles(d);const pct=disp>0?horas/disp:(horas>0?1.5:0);const color=pct>1?'#E24B4A':pct>=0.7?'#E0A23B':'#1D9E75';cap=`<div class="cap-bar" style="margin-top:5px"><div class="cap-fill" style="width:${Math.min(100,pct*100)}%;background:${color}"></div></div>`}
-      return `<div class="kb-col"><div class="kb-col-head"><span>🔧 ${esc(mec)}</span><span class="kb-col-count">${ords.length}</span></div><div class="lane-load">${fmtDur(horas)} ${progDiaSel!=='todas'?'programadas':'activas'}</div>${cap}${ords.length?ords.map(o=>progCard(o,finDe,'mecanico')).join(''):'<div class="kb-empty">—</div>'}</div>`;
+      return `<div class="kb-col" data-drop-mec="${esc(mec)}"><div class="kb-col-head"><span>🔧 ${esc(mec)}</span><span class="kb-col-count">${ords.length}</span></div><div class="lane-load">${fmtDur(horas)} ${progDiaSel!=='todas'?'programadas':'activas'}</div>${cap}${ords.length?ords.map(o=>progCard(o,finDe,'mecanico')).join(''):'<div class="kb-empty">—</div>'}</div>`;
     }).join('');
     bodyHTML=`<div class="kb-context">Carga por mecánico para <strong>${ctx}</strong>. <span style="color:#888">Cambia el mecánico desde cada tarjeta para balancear.</span></div><div class="kanban">${lanesHTML}</div>`;
   } else {
     bodyHTML=`<div class="kb-context">Programadas para <strong>${ctx}</strong>. <span style="color:#888">Esperando repuesto y Listas se muestran siempre.</span></div>
     <div class="kanban">
-      ${col('Por iniciar',pend,'#94560A')}
-      ${col('En proceso',prog,'#0C447C')}
-      ${col('⏸ Esperando repuesto',esper,'#B5481B')}
-      ${col('Listas',listas,'#1D7A4D')}
+      ${col('Por iniciar',pend,'#94560A','pending')}
+      ${col('En proceso',prog,'#0C447C','in-progress')}
+      ${col('⏸ Esperando repuesto',esper,'#B5481B','waiting-parts')}
+      ${col('Listas',listas,'#1D7A4D','done')}
     </div>`;
   }
   cont.innerHTML=stripHTML+toggle+bodyHTML;
+  setupDragKanban();
+}
+
+// ===== Drag & drop del tablero =====
+let _drag=null,_dragSetup=false;
+function setupDragKanban(){
+  if(_dragSetup)return;_dragSetup=true;
+  document.addEventListener('pointerdown',onDragDown,{passive:false});
+  document.addEventListener('pointermove',onDragMove,{passive:false});
+  document.addEventListener('pointerup',onDragUp,{passive:false});
+  document.addEventListener('pointercancel',onDragEnd,{passive:false});
+}
+function _colUnder(x,y){const el=document.elementFromPoint(x,y);return el?el.closest('.kb-col'):null}
+function onDragDown(e){
+  if(currentView!=='programacion')return;
+  if(e.button!==undefined&&e.button>0)return;
+  const card=e.target.closest('.kb-card');if(!card)return;
+  if(e.target.closest('button,select,a,input,textarea,label'))return;
+  const oid=+card.dataset.oid;if(!oid)return;
+  _drag={oid,card,sx:e.clientX,sy:e.clientY,lastX:e.clientX,lastY:e.clientY,active:false,touch:e.pointerType==='touch'};
+  if(_drag.touch)_drag.timer=setTimeout(()=>{if(_drag&&!_drag.active)activarDrag(_drag.lastX,_drag.lastY)},230);
+}
+function activarDrag(x,y){
+  if(!_drag)return;_drag.active=true;
+  const r=_drag.card.getBoundingClientRect();
+  _drag.offX=x-r.left;_drag.offY=y-r.top;
+  const c=_drag.card.cloneNode(true);
+  c.classList.add('kb-dragging');c.style.width=r.width+'px';
+  c.style.left=(x-_drag.offX)+'px';c.style.top=(y-_drag.offY)+'px';
+  document.body.appendChild(c);_drag.clone=c;
+  _drag.card.classList.add('kb-card-ghost');
+  if(navigator.vibrate)try{navigator.vibrate(12)}catch(e){}
+}
+function onDragMove(e){
+  if(!_drag)return;
+  _drag.lastX=e.clientX;_drag.lastY=e.clientY;
+  const dist=Math.hypot(e.clientX-_drag.sx,e.clientY-_drag.sy);
+  if(!_drag.active){
+    if(_drag.touch){if(dist>12){clearTimeout(_drag.timer);_drag=null}return}
+    else{if(dist>5)activarDrag(e.clientX,e.clientY);else return}
+  }
+  if(!_drag||!_drag.active)return;
+  e.preventDefault();
+  _drag.clone.style.left=(e.clientX-_drag.offX)+'px';
+  _drag.clone.style.top=(e.clientY-_drag.offY)+'px';
+  const col=_colUnder(e.clientX,e.clientY);
+  if(_drag.overCol&&_drag.overCol!==col)_drag.overCol.classList.remove('kb-col-over');
+  if(col)col.classList.add('kb-col-over');
+  _drag.overCol=col;
+}
+function onDragUp(e){
+  if(!_drag)return;
+  clearTimeout(_drag.timer);
+  if(_drag.active){
+    e.preventDefault();
+    const col=_colUnder(e.clientX,e.clientY);const oid=_drag.oid;
+    const o=state.ordenes.find(o=>o.id===oid);
+    if(col&&o){
+      if(progModo==='estado'){const st=col.dataset.dropStatus;if(st&&o.status!==st)cambiarEstadoOrden(oid,st)}
+      else{const mec=col.dataset.dropMec;if(mec&&o.mecanico!==mec)reasignarMecanico(oid,mec)}
+    }
+    _cleanupDrag();
+  }else{
+    const dist=Math.hypot(e.clientX-_drag.sx,e.clientY-_drag.sy);const oid=_drag.oid;_drag=null;
+    if(dist<8)abrirOrden(oid);
+  }
+}
+function onDragEnd(){_cleanupDrag()}
+function _cleanupDrag(){
+  if(!_drag)return;
+  if(_drag.clone)_drag.clone.remove();
+  if(_drag.card)_drag.card.classList.remove('kb-card-ghost');
+  if(_drag.overCol)_drag.overCol.classList.remove('kb-col-over');
+  _drag=null;
 }
 
 // ===== Checklist =====

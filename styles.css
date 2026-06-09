@@ -56,8 +56,11 @@ textarea{resize:vertical;min-height:60px}
 .kb-col-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;padding:2px 2px 6px;margin-bottom:8px}
 .kb-col-count{background:#fff;border-radius:20px;padding:0 8px;font-size:11px;color:#666;font-weight:600}
 .kb-empty{text-align:center;color:#bbb;font-size:12px;padding:14px 0}
-.kb-card{background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:9px;margin-bottom:7px;cursor:pointer}
+.kb-card{background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:9px;margin-bottom:7px;cursor:grab;touch-action:pan-y}
 .kb-card:active{background:#fafafa}
+.kb-dragging{position:fixed;z-index:9999;pointer-events:none;box-shadow:0 10px 26px rgba(0,0,0,.28);opacity:.96;transform:rotate(1.5deg);margin:0;cursor:grabbing}
+.kb-card-ghost{opacity:.35}
+.kb-col-over{outline:2px dashed #185FA5;outline-offset:-3px;background:#eef4fb}
 .kb-card-title{font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px}
 .kb-card-meta{font-size:11px;color:#777;margin-top:2px}
 .kb-urg{color:#E24B4A}
