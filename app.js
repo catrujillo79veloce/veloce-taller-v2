@@ -730,7 +730,7 @@ function toggleHist(id){const el=document.getElementById(id);if(el)el.style.disp
 function getAlertas(){
   const ahora=new Date(),al=[];
   state.ordenes.forEach(o=>{
-    if((o.status==='done'||o.status==='delivered')&&!o.recordatorioEnviado){const dias=Math.floor((ahora-new Date(o.fechaTerminado||o.creado))/86400000);if(dias>=45)al.push({tipo:'record45',orden:o,dias})}
+    if(o.status==='delivered'&&!o.recordatorioEnviado){const dias=Math.floor((ahora-new Date(o.fechaTerminado||o.creado))/86400000);if(dias>=45)al.push({tipo:'record45',orden:o,dias})}
     if(o.status==='done'){const dias=Math.floor((ahora-new Date(o.fechaTerminado||o.creado))/86400000);if(dias>=3)al.push({tipo:'sinrecoger',orden:o,dias})}
   });return al;
 }
