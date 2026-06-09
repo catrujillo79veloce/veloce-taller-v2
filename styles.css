@@ -20,7 +20,8 @@ textarea{resize:vertical;min-height:60px}
 .btn-success{background:#1D9E75;color:#fff;border-color:#1D9E75}
 .status{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500}
 .s-pending{background:#FAEEDA;color:#633806}
-.s-progress{background:#E6F1FB;color:#0C447C}
+.s-progress,.s-in-progress{background:#E6F1FB;color:#0C447C}
+.s-waiting-parts{background:#FBE4D4;color:#94380F}
 .s-done{background:#EAF3DE;color:#27500A}
 .s-delivered{background:#F1EFE8;color:#444}
 .divider{border:none;border-top:0.5px solid #e0e0e0;margin:12px 0}
@@ -38,6 +39,31 @@ textarea{resize:vertical;min-height:60px}
 .tab{padding:6px 12px;border-radius:8px;border:0.5px solid #e0e0e0;cursor:pointer;font-size:12px;background:transparent;color:#888}
 .tab.active{background:#f5f5f5;color:#111;font-weight:500}
 .empty{text-align:center;padding:32px;color:#888;font-size:13px}
+/* Programación: agenda + kanban */
+.prog-days{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+.prog-day{min-width:96px;flex:0 0 96px;border:1px solid #e0e0e0;border-radius:10px;padding:9px 10px;cursor:pointer;background:#fff;transition:all .12s}
+.prog-day.sel{border-color:#111;box-shadow:0 0 0 1.5px #111}
+.prog-day-all{background:#fafafa}
+.prog-day-date{font-size:13px;font-weight:700;text-transform:capitalize;color:#111}
+.prog-day-sub{font-size:10px;color:#aaa;text-transform:capitalize;margin-bottom:5px}
+.prog-day-count{font-size:11px;color:#666;margin-bottom:6px}
+.cap-bar{height:6px;border-radius:4px;background:#eee;overflow:hidden}
+.cap-fill{height:100%;border-radius:4px}
+.prog-day-cap{font-size:10px;color:#888;margin-top:4px}
+.kb-context{font-size:12px;color:#555;margin:0 2px 10px}
+.kanban{display:flex;gap:10px;overflow-x:auto;padding-bottom:10px;-webkit-overflow-scrolling:touch;align-items:flex-start}
+.kb-col{flex:1 0 210px;min-width:210px;background:#f7f7f7;border-radius:10px;padding:8px}
+.kb-col-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;padding:2px 2px 6px;margin-bottom:8px}
+.kb-col-count{background:#fff;border-radius:20px;padding:0 8px;font-size:11px;color:#666;font-weight:600}
+.kb-empty{text-align:center;color:#bbb;font-size:12px;padding:14px 0}
+.kb-card{background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:9px;margin-bottom:7px;cursor:pointer}
+.kb-card:active{background:#fafafa}
+.kb-card-title{font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px}
+.kb-card-meta{font-size:11px;color:#777;margin-top:2px}
+.kb-urg{color:#E24B4A}
+.kb-overdue{background:#FDE2E1;color:#C0392B;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;text-transform:uppercase}
+.kb-actions{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
+.kb-actions .btn{font-size:11px;padding:4px 8px}
 .section{margin-bottom:10px}
 .cliente-info{background:#f5f5f5;border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:10px}
 .tipo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-bottom:6px}

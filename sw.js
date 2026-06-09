@@ -1,4 +1,4 @@
-const CACHE='veloce-taller-v5';
+const CACHE='veloce-taller-v6';
 const ASSETS=['./','./index.html','./styles.css','./app.js','./manifest.json','./config.js','./db.js','./auth.js'];
 
 self.addEventListener('install',e=>{

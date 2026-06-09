@@ -9,6 +9,7 @@ const DURACION_MIN={'Mantenimiento':180,'Mantenimiento ruta/MTB':180,'Mantenimie
 // Estado en memoria (cache, se sincroniza con Supabase)
 let state = { clientes: [], ordenes: [], mecanicos: ['Carlos','Andrés','Juan'], nextId: 1001, consignaciones: [] };
 let selectedTipos=[], currentView='asesor', mecFilter='pending', clienteActivo=null, biciActiva=null;
+let progDiaSel=null;
 let fotosIngreso=[];
 
 // ===== Helpers =====
@@ -16,7 +17,7 @@ function esc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').repla
 function toast(msg,type){const w=document.getElementById('toast-wrap');if(!w)return;const t=document.createElement('div');t.className='toast '+(type||'info');t.textContent=msg;w.appendChild(t);setTimeout(()=>{t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(()=>t.remove(),300)},2500)}
 function waLink(tel,msg){const clean=String(tel||'').replace(/\D/g,'');const num=clean.length===10?'57'+clean:clean;return`https://wa.me/${num}?text=${encodeURIComponent(msg)}`}
 function fmtDate(iso){return new Date(iso).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'})}
-function statusLabel(s){return{pending:'Pendiente','in-progress':'En progreso',done:'Terminada',delivered:'Entregada'}[s]||s}
+function statusLabel(s){return{pending:'Pendiente','in-progress':'En progreso','waiting-parts':'Esperando repuesto',done:'Terminada',delivered:'Entregada'}[s]||s}
 function totalOrden(o){return(o.reparaciones||[]).reduce((s,r)=>s+(parseFloat(r.precio)||0),0)}
 function duracionTipo(t){if(DURACION_MIN[t]!=null)return DURACION_MIN[t];if(t&&t.startsWith('Otro'))return 30;return 30}
 function duracionOrden(o){return(o.tiposTrabajo||[]).reduce((s,t)=>s+duracionTipo(t),0)}
@@ -44,7 +45,8 @@ function addWorkMinutes(start,minutes){
 
 function calcularCola(){
   const prio={urgente:0,normal:1,espera:2};
-  const cola=state.ordenes.filter(o=>o.status==='pending'||o.status==='in-progress').sort((a,b)=>(prio[a.prioridad]??1)-(prio[b.prioridad]??1)||new Date(a.creado)-new Date(b.creado));
+  const rank=o=>o.status==='in-progress'?0:1; // en progreso va primero (ya está en el banco)
+  const cola=state.ordenes.filter(o=>o.status==='pending'||o.status==='in-progress').sort((a,b)=>rank(a)-rank(b)||(prio[a.prioridad]??1)-(prio[b.prioridad]??1)||new Date(a.creado)-new Date(b.creado));
   const map=new Map();let cursor=new Date();
   for(const o of cola){
     const dur=duracionOrden(o);
@@ -139,15 +141,16 @@ async function gestionarMecanicos(){
 // ===== Navegación =====
 function showView(v){
   currentView=v;
-  const views=['asesor','mecanico','caja','historial','consignacion','notif'];
+  const views=['asesor','mecanico','programacion','caja','historial','consignacion','notif'];
   views.forEach(x=>document.getElementById('view-'+x).style.display=x===v?'block':'none');
   document.querySelectorAll('.nav-btn').forEach((b,i)=>b.classList.toggle('active',views[i]===v));
-  if(v==='mecanico')renderMecanico();if(v==='historial')renderHistorial();if(v==='notif')renderNotif();if(v==='asesor')renderOrdenesRecientes();if(v==='caja')renderCaja();if(v==='consignacion')renderConsignacion();
+  if(v==='mecanico')renderMecanico();if(v==='programacion')renderProgramacion();if(v==='historial')renderHistorial();if(v==='notif')renderNotif();if(v==='asesor')renderOrdenesRecientes();if(v==='caja')renderCaja();if(v==='consignacion')renderConsignacion();
   updateBadges();
 }
 function updateBadges(){
   const pend=state.ordenes.filter(o=>o.status==='pending').length;
   const mb=document.getElementById('mec-badge');if(mb){mb.textContent=pend;mb.style.display=pend>0?'':'none'}
+  const pb=document.getElementById('prog-badge');if(pb){const cP=calcularCola();const hoyD=new Date();let pt=0;state.ordenes.forEach(o=>{if(o.status==='pending'||o.status==='in-progress'){const e=cP.get(o.id);const f=e?e.fin:(o.fechaCompromiso?new Date(o.fechaCompromiso):null);if(f&&_mismoDia(f,hoyD))pt++}});pb.textContent=pt;pb.style.display=pt>0?'':'none'}
   const al=getAlertas().length;const nb=document.getElementById('notif-badge');if(nb){nb.textContent=al;nb.style.display=al>0?'':'none'}
   const disp=(state.consignaciones||[]).filter(c=>c.status==='disponible').length;
   const cb=document.getElementById('cons-badge');if(cb){cb.textContent=disp;cb.style.display=disp>0?'':'none'}
@@ -155,6 +158,7 @@ function updateBadges(){
 async function refrescarVista(){
   await reloadState();
   if(currentView==='mecanico')renderMecanico();
+  if(currentView==='programacion')renderProgramacion();
   if(currentView==='caja')renderCaja();
   if(currentView==='historial')renderHistorial();
   if(currentView==='asesor')renderOrdenesRecientes();
@@ -306,6 +310,113 @@ function renderMecanico(){
   }).join('');
 }
 
+// ===== Programación (Agenda + Kanban) =====
+function _localKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function _mismoDia(a,b){return a&&b&&a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate()}
+function minutosDisponibles(date){
+  const slots=HORARIO_TALLER[date.getDay()]||[];const ahora=new Date();const esHoy=_mismoDia(date,ahora);
+  const nowMin=esHoy?ahora.getHours()*60+ahora.getMinutes():0;let total=0;
+  for(const [s,e] of slots){const ini=Math.max(s,esHoy?nowMin:0);if(e>ini)total+=e-ini}
+  return total;
+}
+function filtrarProgDia(key){progDiaSel=key;renderProgramacion()}
+
+async function cambiarEstadoOrden(oid,estado,opts){
+  opts=opts||{};const o=state.ordenes.find(o=>o.id===oid);if(!o)return;
+  if(opts.guardar){guardarRepEnMemoria(oid);aplicarEditsEnMemoria(oid)}
+  const patch={status:estado};
+  if(estado==='done'&&!o.fechaTerminado)patch.fechaTerminado=new Date().toISOString();
+  if(opts.guardar)Object.assign(patch,{mecanico:o.mecanico,prioridad:o.prioridad,descripcion:o.descripcion,notas:o.notas});
+  try{
+    await window.db.updateOrden(oid,patch);
+    if(opts.guardar)await window.db.setReparaciones(oid,o.reparaciones);
+    if(opts.cerrar)cerrarModal();
+    await refrescarVista();
+    toast('→ '+statusLabel(estado),'info');
+  }catch(err){toast('Error: '+err.message,'error')}
+}
+
+function progCard(o,finDe){
+  const fin=finDe(o);
+  const atrasada=(o.status==='pending'||o.status==='in-progress')&&fin&&fin<new Date();
+  const urg=o.prioridad==='urgente'?'<span class="kb-urg">⚡</span>':'';
+  let acc='';
+  if(o.status==='pending')acc=`<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();cambiarEstadoOrden(${o.id},'in-progress')">▶ Iniciar</button><button class="btn btn-sm" onclick="event.stopPropagation();cambiarEstadoOrden(${o.id},'waiting-parts')">⏸ Repuesto</button>`;
+  else if(o.status==='in-progress')acc=`<button class="btn btn-sm btn-success" onclick="event.stopPropagation();cambiarEstadoOrden(${o.id},'done')">✓ Terminar</button><button class="btn btn-sm" onclick="event.stopPropagation();cambiarEstadoOrden(${o.id},'waiting-parts')">⏸ Repuesto</button>`;
+  else if(o.status==='waiting-parts')acc=`<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();cambiarEstadoOrden(${o.id},'in-progress')">▶ Reanudar</button><button class="btn btn-sm" onclick="event.stopPropagation();cambiarEstadoOrden(${o.id},'pending')">↩ Pendiente</button>`;
+  else if(o.status==='done')acc=`<button class="btn btn-sm" onclick="event.stopPropagation();cambiarEstadoOrden(${o.id},'delivered')">📦 Entregar</button><button class="btn btn-sm" onclick="event.stopPropagation();cambiarEstadoOrden(${o.id},'in-progress')">↩ Reabrir</button>`;
+  const horaFin=(o.status==='pending'||o.status==='in-progress')&&fin?`<div class="kb-card-meta" style="color:#185FA5">📅 ${fmtFechaHora(fin)}</div>`:'';
+  return `<div class="kb-card" onclick="abrirOrden(${o.id})">
+    <div class="kb-card-title">#${o.id} ${urg}${atrasada?'<span class="kb-overdue">Atrasada</span>':''}</div>
+    <div class="kb-card-meta"><strong>${esc(o.bici.marca)} ${esc(o.bici.modelo)}</strong></div>
+    <div class="kb-card-meta">${esc(o.clienteNombre)}</div>
+    <div class="kb-card-meta">${esc((o.tiposTrabajo||[]).join(', '))} · ${fmtDur(duracionOrden(o))}</div>
+    ${horaFin}
+    <div class="kb-actions">${acc}</div>
+  </div>`;
+}
+
+function renderProgramacion(){
+  const cont=document.getElementById('prog-contenido');if(!cont)return;
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  if(progDiaSel===null)progDiaSel=_localKey(hoy);
+  const cola=calcularCola();
+  const activos=state.ordenes.filter(o=>o.status==='pending'||o.status==='in-progress');
+  const finDe=o=>{const e=cola.get(o.id);return e?e.fin:(o.fechaCompromiso?new Date(o.fechaCompromiso):new Date())};
+
+  // Tira de días hábiles
+  const dias=[];let cur=new Date(hoy);let g=0;
+  while(dias.length<6&&g<25){g++;if((HORARIO_TALLER[cur.getDay()]||[]).length)dias.push(new Date(cur));cur.setDate(cur.getDate()+1)}
+  const mañana=new Date(hoy.getTime()+86400000);
+  const diasHTML=dias.map(d=>{
+    const key=_localKey(d);
+    const ords=activos.filter(o=>_mismoDia(finDe(o),d));
+    const usados=ords.reduce((s,o)=>s+duracionOrden(o),0);
+    const disp=minutosDisponibles(d);
+    const pct=disp>0?usados/disp:(usados>0?1.5:0);
+    const color=pct>1?'#E24B4A':pct>=0.7?'#E0A23B':'#1D9E75';
+    const etq=_mismoDia(d,hoy)?'Hoy':_mismoDia(d,mañana)?'Mañana':d.toLocaleDateString('es-CO',{weekday:'short'});
+    return `<div class="prog-day${key===progDiaSel?' sel':''}" onclick="filtrarProgDia('${key}')">
+      <div class="prog-day-date">${etq}</div>
+      <div class="prog-day-sub">${d.toLocaleDateString('es-CO',{day:'2-digit',month:'short'})}</div>
+      <div class="prog-day-count">${ords.length} bici${ords.length===1?'':'s'}</div>
+      <div class="cap-bar"><div class="cap-fill" style="width:${Math.min(100,pct*100)}%;background:${color}"></div></div>
+      <div class="prog-day-cap">${fmtDur(usados)} / ${disp>0?fmtDur(disp):'cerrado'}</div>
+    </div>`;
+  }).join('');
+  const stripHTML=`<div class="card" style="padding:14px">
+    <div class="card-header"><h2 style="font-size:16px">Programación del taller</h2></div>
+    <div class="prog-days">
+      <div class="prog-day prog-day-all${progDiaSel==='todas'?' sel':''}" onclick="filtrarProgDia('todas')"><div class="prog-day-date">Todas</div><div class="prog-day-sub">los días</div><div class="prog-day-count">${activos.length} activas</div></div>
+      ${diasHTML}
+    </div>
+  </div>`;
+
+  // Kanban
+  const filtraDia=o=>progDiaSel==='todas'||_localKey(finDe(o))===progDiaSel;
+  const pend=activos.filter(o=>o.status==='pending'&&filtraDia(o)).sort((a,b)=>finDe(a)-finDe(b));
+  const prog=activos.filter(o=>o.status==='in-progress'&&filtraDia(o)).sort((a,b)=>finDe(a)-finDe(b));
+  const esper=state.ordenes.filter(o=>o.status==='waiting-parts').sort((a,b)=>new Date(b.creado)-new Date(a.creado));
+  const listas=state.ordenes.filter(o=>o.status==='done').sort((a,b)=>new Date(b.creado)-new Date(a.creado));
+  let ctx;
+  if(progDiaSel==='todas')ctx='todos los días';
+  else{const d=dias.find(x=>_localKey(x)===progDiaSel);ctx=d?(_mismoDia(d,hoy)?'hoy':d.toLocaleDateString('es-CO',{weekday:'long',day:'2-digit',month:'short'})):'el día seleccionado'}
+
+  const col=(titulo,ords,accent)=>`<div class="kb-col">
+    <div class="kb-col-head" style="color:${accent};border-bottom:2px solid ${accent}"><span>${titulo}</span><span class="kb-col-count">${ords.length}</span></div>
+    ${ords.length?ords.map(o=>progCard(o,finDe)).join(''):'<div class="kb-empty">—</div>'}
+  </div>`;
+
+  cont.innerHTML=stripHTML+
+    `<div class="kb-context">Programadas para <strong>${ctx}</strong>. <span style="color:#888">Esperando repuesto y Listas se muestran siempre.</span></div>
+    <div class="kanban">
+      ${col('Por iniciar',pend,'#94560A')}
+      ${col('En proceso',prog,'#0C447C')}
+      ${col('⏸ Esperando repuesto',esper,'#B5481B')}
+      ${col('Listas',listas,'#1D7A4D')}
+    </div>`;
+}
+
 // ===== Checklist =====
 function renderChecklist(o){
   const cl=o.checklist||{};
@@ -382,7 +493,7 @@ function abrirOrden(id){
   const dur=duracionOrden(o);
   const compromisoTxt=o.fechaCompromiso?`<span class="meta">📅 Compromiso: ${fmtFechaHora(new Date(o.fechaCompromiso))}</span>`:'';
   const entregaActual=entry?`<span class="meta" style="color:#185FA5">🔄 Estimación actual: ${fmtFechaHora(entry.fin)}</span>`:'';
-  document.getElementById('modal-contenido').innerHTML=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center"><span class="status s-${o.status}">${statusLabel(o.status)}</span><span class="meta">Ingresó: ${fmtDate(o.creado)}</span><span class="meta">⏱ ${fmtDur(dur)}</span>${compromisoTxt}${entregaActual}</div><div class="cliente-info"><strong>${esc(o.clienteNombre)}</strong> · ${esc(o.clienteTel)} <a class="btn btn-sm wa-btn" style="float:right;padding:2px 8px;font-size:11px" href="${waLink(o.clienteTel,'Hola '+o.clienteNombre)}" target="_blank" rel="noopener">📱 WhatsApp</a></div><div class="grid2"><div class="section"><label>Mecánico</label><select id="edit-mec-${o.id}">${renderMecanicoOptions(o.mecanico)}</select></div><div class="section"><label>Prioridad</label><select id="edit-prio-${o.id}">${prioOpts.map(p=>`<option value="${p}" ${o.prioridad===p?'selected':''}>${p}</option>`).join('')}</select></div></div><div style="margin-bottom:8px"><span style="font-size:12px;font-weight:500;color:#888">Tipo de trabajo: </span><span style="font-size:12px">${esc((o.tiposTrabajo||[]).join(' · '))}</span></div><div class="section"><label>Descripción / observaciones</label><textarea id="edit-desc-${o.id}">${esc(o.descripcion||'')}</textarea></div><div class="section"><label>Fotos</label>${renderFotosOrden(o)}</div><hr class="divider"><div id="cl-wrap-${o.id}">${renderChecklist(o)}</div><hr class="divider"><h3 style="margin-bottom:8px">Trabajo realizado y repuestos</h3><div id="reps-list-${o.id}">${reps.map((r,i)=>`<div class="repair-row"><input value="${esc(r.codigo||'')}" placeholder="SKU" id="rep-c-${o.id}-${i}" style="flex:1;min-width:70px;max-width:110px"><input value="${esc(r.desc)}" placeholder="Servicios y repuestos" id="rep-d-${o.id}-${i}" style="flex:2" oninput="recalcTotal(${o.id})"><input value="${esc(r.precio)}" type="number" placeholder="$ Valor" id="rep-p-${o.id}-${i}" style="flex:1;min-width:80px" oninput="recalcTotal(${o.id})"><button class="btn btn-sm" onclick="eliminarRep(${o.id},${i})">✕</button></div>`).join('')}</div><button class="btn btn-sm" onclick="agregarRep(${o.id})" style="margin-bottom:8px">+ Agregar línea</button><div class="total-box"><span style="font-weight:500;font-size:14px">Total orden</span><span style="font-size:18px;font-weight:500" id="total-${o.id}">$ ${total.toLocaleString('es-CO')}</span></div><hr class="divider"><div class="section"><label>Notas internas del mecánico</label><textarea id="notas-${o.id}">${esc(o.notas||'')}</textarea></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn" onclick="guardarOrden(${o.id})">💾 Guardar</button>${o.status==='pending'?`<button class="btn btn-primary" onclick="iniciarOrden(${o.id})">▶ Iniciar trabajo</button>`:''} ${o.status==='in-progress'?`<button class="btn" onclick="pausarOrden(${o.id})">⏸ Volver a pendiente</button>`:''} ${o.status!=='done'&&o.status!=='delivered'?`<button class="btn btn-success" onclick="terminarOrden(${o.id})">✓ Terminar y notificar</button>`:''} ${o.status==='done'?`<button class="btn" onclick="marcarEntregada(${o.id})">📦 Marcar entregada</button>`:''} ${o.status==='done'||o.status==='delivered'?`<button class="btn btn-sm" onclick="verReporte(${o.id})">Ver reporte</button>`:''} <button class="btn btn-sm" onclick="imprimirRecibo(${o.id})">🖨 Imprimir</button> <button class="btn btn-sm" onclick="mostrarAccionesIngreso(${o.id})">📱 WhatsApp ingreso</button> <button class="btn btn-sm" style="margin-left:auto;color:#E24B4A;border-color:#E24B4A" onclick="eliminarOrden(${o.id})">🗑 Eliminar</button></div>`;
+  document.getElementById('modal-contenido').innerHTML=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center"><span class="status s-${o.status}">${statusLabel(o.status)}</span><span class="meta">Ingresó: ${fmtDate(o.creado)}</span><span class="meta">⏱ ${fmtDur(dur)}</span>${compromisoTxt}${entregaActual}</div><div class="cliente-info"><strong>${esc(o.clienteNombre)}</strong> · ${esc(o.clienteTel)} <a class="btn btn-sm wa-btn" style="float:right;padding:2px 8px;font-size:11px" href="${waLink(o.clienteTel,'Hola '+o.clienteNombre)}" target="_blank" rel="noopener">📱 WhatsApp</a></div><div class="grid2"><div class="section"><label>Mecánico</label><select id="edit-mec-${o.id}">${renderMecanicoOptions(o.mecanico)}</select></div><div class="section"><label>Prioridad</label><select id="edit-prio-${o.id}">${prioOpts.map(p=>`<option value="${p}" ${o.prioridad===p?'selected':''}>${p}</option>`).join('')}</select></div></div><div style="margin-bottom:8px"><span style="font-size:12px;font-weight:500;color:#888">Tipo de trabajo: </span><span style="font-size:12px">${esc((o.tiposTrabajo||[]).join(' · '))}</span></div><div class="section"><label>Descripción / observaciones</label><textarea id="edit-desc-${o.id}">${esc(o.descripcion||'')}</textarea></div><div class="section"><label>Fotos</label>${renderFotosOrden(o)}</div><hr class="divider"><div id="cl-wrap-${o.id}">${renderChecklist(o)}</div><hr class="divider"><h3 style="margin-bottom:8px">Trabajo realizado y repuestos</h3><div id="reps-list-${o.id}">${reps.map((r,i)=>`<div class="repair-row"><input value="${esc(r.codigo||'')}" placeholder="SKU" id="rep-c-${o.id}-${i}" style="flex:1;min-width:70px;max-width:110px"><input value="${esc(r.desc)}" placeholder="Servicios y repuestos" id="rep-d-${o.id}-${i}" style="flex:2" oninput="recalcTotal(${o.id})"><input value="${esc(r.precio)}" type="number" placeholder="$ Valor" id="rep-p-${o.id}-${i}" style="flex:1;min-width:80px" oninput="recalcTotal(${o.id})"><button class="btn btn-sm" onclick="eliminarRep(${o.id},${i})">✕</button></div>`).join('')}</div><button class="btn btn-sm" onclick="agregarRep(${o.id})" style="margin-bottom:8px">+ Agregar línea</button><div class="total-box"><span style="font-weight:500;font-size:14px">Total orden</span><span style="font-size:18px;font-weight:500" id="total-${o.id}">$ ${total.toLocaleString('es-CO')}</span></div><hr class="divider"><div class="section"><label>Notas internas del mecánico</label><textarea id="notas-${o.id}">${esc(o.notas||'')}</textarea></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn" onclick="guardarOrden(${o.id})">💾 Guardar</button>${o.status==='pending'?`<button class="btn btn-primary" onclick="iniciarOrden(${o.id})">▶ Iniciar trabajo</button>`:''} ${o.status==='in-progress'?`<button class="btn" onclick="pausarOrden(${o.id})">⏸ Volver a pendiente</button>`:''} ${(o.status==='pending'||o.status==='in-progress')?`<button class="btn" onclick="cambiarEstadoOrden(${o.id},'waiting-parts',{cerrar:true,guardar:true})">📦 Esperando repuesto</button>`:''} ${o.status==='waiting-parts'?`<button class="btn btn-primary" onclick="cambiarEstadoOrden(${o.id},'in-progress',{cerrar:true,guardar:true})">▶ Reanudar trabajo</button>`:''} ${o.status!=='done'&&o.status!=='delivered'?`<button class="btn btn-success" onclick="terminarOrden(${o.id})">✓ Terminar y notificar</button>`:''} ${o.status==='done'?`<button class="btn" onclick="marcarEntregada(${o.id})">📦 Marcar entregada</button>`:''} ${o.status==='done'||o.status==='delivered'?`<button class="btn btn-sm" onclick="verReporte(${o.id})">Ver reporte</button>`:''} <button class="btn btn-sm" onclick="imprimirRecibo(${o.id})">🖨 Imprimir</button> <button class="btn btn-sm" onclick="mostrarAccionesIngreso(${o.id})">📱 WhatsApp ingreso</button> <button class="btn btn-sm" style="margin-left:auto;color:#E24B4A;border-color:#E24B4A" onclick="eliminarOrden(${o.id})">🗑 Eliminar</button></div>`;
   document.getElementById('modal-orden').style.display='block';
 }
 function recalcTotal(oid){const o=state.ordenes.find(o=>o.id===oid);if(!o)return;const total=(o.reparaciones||[]).reduce((s,_,i)=>s+(parseFloat(document.getElementById(`rep-p-${oid}-${i}`)?.value)||0),0);const el=document.getElementById('total-'+oid);if(el)el.textContent='$ '+total.toLocaleString('es-CO')}

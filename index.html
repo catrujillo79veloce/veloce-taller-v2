@@ -54,6 +54,7 @@
 <div class="nav">
   <button class="nav-btn active" onclick="showView('asesor')">Asesor</button>
   <button class="nav-btn" onclick="showView('mecanico')">Mecánico <span class="badge" id="mec-badge" style="display:none">0</span></button>
+  <button class="nav-btn" onclick="showView('programacion')">Agenda <span class="badge" id="prog-badge" style="display:none">0</span></button>
   <button class="nav-btn" onclick="showView('caja')">Caja</button>
   <button class="nav-btn" onclick="showView('historial')">Historial</button>
   <button class="nav-btn" onclick="showView('consignacion')">Consig. <span class="badge" id="cons-badge" style="display:none">0</span></button>
@@ -136,6 +137,10 @@
     <button class="tab" onclick="filtrarMec('all')">Todas</button>
   </div>
   <div id="lista-mecanico"></div>
+</div>
+
+<div id="view-programacion" style="display:none">
+  <div id="prog-contenido"></div>
 </div>
 
 <div id="view-historial" style="display:none">
