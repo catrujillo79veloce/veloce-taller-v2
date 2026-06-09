@@ -9,7 +9,7 @@ const DURACION_MIN={'Mantenimiento':180,'Mantenimiento ruta/MTB':180,'Mantenimie
 // Estado en memoria (cache, se sincroniza con Supabase)
 let state = { clientes: [], ordenes: [], mecanicos: ['Carlos','Andrés','Juan'], nextId: 1001, consignaciones: [] };
 let selectedTipos=[], currentView='asesor', mecFilter='pending', clienteActivo=null, biciActiva=null;
-let progDiaSel=null;
+let progDiaSel=null, progModo='estado';
 let fotosIngreso=[];
 
 // ===== Helpers =====
@@ -320,6 +320,11 @@ function minutosDisponibles(date){
   return total;
 }
 function filtrarProgDia(key){progDiaSel=key;renderProgramacion()}
+function setProgModo(m){progModo=m;renderProgramacion()}
+async function reasignarMecanico(oid,mec){
+  const o=state.ordenes.find(o=>o.id===oid);if(!o)return;
+  try{await window.db.updateOrden(oid,{mecanico:mec});o.mecanico=mec;renderProgramacion();toast('Reasignada a '+mec,'info')}catch(err){toast('Error: '+err.message,'error')}
+}
 function proximosDiasHabiles(n){const out=[];const c=new Date();c.setHours(0,0,0,0);let g=0;while(out.length<n&&g<45){g++;if((HORARIO_TALLER[c.getDay()]||[]).length)out.push(new Date(c));c.setDate(c.getDate()+1)}return out}
 function _labelDiaKey(k){const d=new Date(k+'T00:00:00');const h=new Date();h.setHours(0,0,0,0);const m=new Date(h.getTime()+86400000);return _mismoDia(d,h)?'Hoy':_mismoDia(d,m)?'Mañana':d.toLocaleDateString('es-CO',{weekday:'short',day:'2-digit',month:'short'})}
 async function setDiaProgramado(oid,val){
@@ -347,7 +352,8 @@ async function cambiarEstadoOrden(oid,estado,opts){
   }catch(err){toast('Error: '+err.message,'error')}
 }
 
-function progCard(o,finDe){
+function progCard(o,finDe,modo){
+  modo=modo||'estado';
   const fin=finDe(o);
   const activa=o.status==='pending'||o.status==='in-progress';
   const atrasada=activa&&!o.diaProgramado&&fin&&fin<new Date();
@@ -370,13 +376,16 @@ function progCard(o,finDe){
   const diaInfo=o.diaProgramado
     ?`<div class="kb-card-meta kb-pin">📌 Fijada: ${_labelDiaKey(o.diaProgramado)}</div>`
     :(activa&&fin?`<div class="kb-card-meta" style="color:#185FA5">📅 ${fmtFechaHora(fin)}</div>`:'');
+  const statusBadge=modo==='mecanico'?`<span class="status s-${o.status}" style="font-size:10px">${statusLabel(o.status)}</span>`:'';
+  const mecSel=modo==='mecanico'?`<select class="kb-day" onclick="event.stopPropagation()" onchange="reasignarMecanico(${o.id},this.value)">${renderMecanicoOptions(o.mecanico)}</select>`:'';
+  const mecInfo=modo==='estado'&&o.mecanico&&o.mecanico!=='Sin asignar'?`<div class="kb-card-meta">🔧 ${esc(o.mecanico)}</div>`:'';
   return `<div class="kb-card" onclick="abrirOrden(${o.id})">
-    <div class="kb-card-title">#${o.id} ${urg}${atrasada?'<span class="kb-overdue">Atrasada</span>':''}</div>
+    <div class="kb-card-title">#${o.id} ${urg}${statusBadge}${atrasada?'<span class="kb-overdue">Atrasada</span>':''}</div>
     <div class="kb-card-meta"><strong>${esc(o.bici.marca)} ${esc(o.bici.modelo)}</strong></div>
     <div class="kb-card-meta">${esc(o.clienteNombre)}</div>
     <div class="kb-card-meta">${esc((o.tiposTrabajo||[]).join(', '))} · ${fmtDur(duracionOrden(o))}</div>
-    ${diaInfo}
-    <div class="kb-actions">${acc}${diaSel}</div>
+    ${mecInfo}${diaInfo}
+    <div class="kb-actions">${acc}${diaSel}${mecSel}</div>
   </div>`;
 }
 
@@ -432,14 +441,34 @@ function renderProgramacion(){
     ${ords.length?ords.map(o=>progCard(o,finDe)).join(''):'<div class="kb-empty">—</div>'}
   </div>`;
 
-  cont.innerHTML=stripHTML+
-    `<div class="kb-context">Programadas para <strong>${ctx}</strong>. <span style="color:#888">Esperando repuesto y Listas se muestran siempre.</span></div>
+  const toggle=`<div class="prog-modo"><button class="pm-btn ${progModo==='estado'?'active':''}" onclick="setProgModo('estado')">Por estado</button><button class="pm-btn ${progModo==='mecanico'?'active':''}" onclick="setProgModo('mecanico')">Por mecánico</button></div>`;
+
+  let bodyHTML;
+  if(progModo==='mecanico'){
+    const noFin=state.ordenes.filter(o=>o.status==='pending'||o.status==='in-progress'||o.status==='waiting-parts');
+    const hayManual=noFin.some(o=>!state.mecanicos.includes(o.mecanico));
+    const lanes=hayManual?[...state.mecanicos,'Sin asignar']:[...state.mecanicos];
+    const rankS={'in-progress':0,'pending':1,'waiting-parts':2};
+    const lanesHTML=lanes.map(mec=>{
+      const sinAsig=mec==='Sin asignar';
+      const match=o=>sinAsig?!state.mecanicos.includes(o.mecanico):o.mecanico===mec;
+      const ords=noFin.filter(o=>match(o)&&(o.status==='waiting-parts'||filtraDia(o))).sort((a,b)=>rankS[a.status]-rankS[b.status]||diaDe(a)-diaDe(b));
+      const horas=ords.filter(o=>o.status!=='waiting-parts').reduce((s,o)=>s+duracionOrden(o),0);
+      let cap='';
+      if(progDiaSel!=='todas'){const d=dias.find(x=>_localKey(x)===progDiaSel)||new Date(progDiaSel+'T00:00:00');const disp=minutosDisponibles(d);const pct=disp>0?horas/disp:(horas>0?1.5:0);const color=pct>1?'#E24B4A':pct>=0.7?'#E0A23B':'#1D9E75';cap=`<div class="cap-bar" style="margin-top:5px"><div class="cap-fill" style="width:${Math.min(100,pct*100)}%;background:${color}"></div></div>`}
+      return `<div class="kb-col"><div class="kb-col-head"><span>🔧 ${esc(mec)}</span><span class="kb-col-count">${ords.length}</span></div><div class="lane-load">${fmtDur(horas)} ${progDiaSel!=='todas'?'programadas':'activas'}</div>${cap}${ords.length?ords.map(o=>progCard(o,finDe,'mecanico')).join(''):'<div class="kb-empty">—</div>'}</div>`;
+    }).join('');
+    bodyHTML=`<div class="kb-context">Carga por mecánico para <strong>${ctx}</strong>. <span style="color:#888">Cambia el mecánico desde cada tarjeta para balancear.</span></div><div class="kanban">${lanesHTML}</div>`;
+  } else {
+    bodyHTML=`<div class="kb-context">Programadas para <strong>${ctx}</strong>. <span style="color:#888">Esperando repuesto y Listas se muestran siempre.</span></div>
     <div class="kanban">
       ${col('Por iniciar',pend,'#94560A')}
       ${col('En proceso',prog,'#0C447C')}
       ${col('⏸ Esperando repuesto',esper,'#B5481B')}
       ${col('Listas',listas,'#1D7A4D')}
     </div>`;
+  }
+  cont.innerHTML=stripHTML+toggle+bodyHTML;
 }
 
 // ===== Checklist =====
