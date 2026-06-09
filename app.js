@@ -19,6 +19,9 @@ function waLink(tel,msg){const clean=String(tel||'').replace(/\D/g,'');const num
 function fmtDate(iso){return new Date(iso).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'})}
 function statusLabel(s){return{pending:'Pendiente','in-progress':'En progreso','waiting-parts':'Esperando repuesto',done:'Terminada',delivered:'Entregada'}[s]||s}
 function totalOrden(o){return(o.reparaciones||[]).reduce((s,r)=>s+(parseFloat(r.precio)||0),0)}
+const SKU_MANO_OBRA='17598'; // SKU de taller / mano de obra
+function esManoDeObra(codigo){return String(codigo||'').trim().replace(/\/+$/,'').trim()===SKU_MANO_OBRA}
+function manoObraOrden(o){return(o.reparaciones||[]).filter(r=>esManoDeObra(r.codigo)).reduce((s,r)=>s+(parseFloat(r.precio)||0),0)}
 function duracionTipo(t){if(DURACION_MIN[t]!=null)return DURACION_MIN[t];if(t&&t.startsWith('Otro'))return 30;return 30}
 function duracionOrden(o){return(o.tiposTrabajo||[]).reduce((s,t)=>s+duracionTipo(t),0)}
 function fmtDur(min){const h=Math.floor(min/60),m=min%60;if(h&&m)return`${h}h ${m}min`;if(h)return`${h}h`;return`${m}min`}
@@ -846,17 +849,17 @@ function renderCaja(){
   const statsMec=statsMecanicos();
   div.innerHTML=`<div class="grid3">${card('Hoy',sHoy,'#1D9E75')}${card('Esta semana',sSem,'#185FA5')}${card('Este mes',sMes,'#D85A30')}</div>
   <div class="card"><div class="card-header"><h2>Pendientes de cobro</h2><span class="meta">${pendCobro.length} orden(es) · ${fmt(totalPendCobro)}</span></div>${pendCobro.length===0?'<div class="empty">Todo cobrado ✓</div>':pendCobro.map(o=>`<div class="work-item done" onclick="abrirOrden(${o.id})"><div style="display:flex;justify-content:space-between"><span style="font-weight:500;font-size:13px">#${o.id} · ${esc(o.clienteNombre)}</span><span style="font-weight:500">${fmt(totalOrden(o))}</span></div><div class="meta">${esc(o.bici.marca)} ${esc(o.bici.modelo)} · terminada ${fmtDate(o.fechaTerminado||o.creado)}</div></div>`).join('')}</div>
-  <div class="card"><div class="card-header"><h2>Producción por mecánico</h2><span class="meta">Último mes</span></div>${statsMec.length===0?'<div class="empty">Sin datos</div>':statsMec.map(m=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:500;font-size:13px">${esc(m.nombre)}</span><span style="font-weight:500;font-size:13px">${fmt(m.total)}</span></div><div style="display:flex;align-items:center;gap:8px"><div class="bar-wrap"><div class="bar-fill" style="width:${m.pct}%;background:#185FA5"></div></div><span class="meta">${m.count} órdenes</span></div></div>`).join('')}</div>
+  <div class="card"><div class="card-header"><h2>Producción por mecánico</h2><span class="meta">Mano de obra · este mes</span></div>${statsMec.length===0?'<div class="empty">Sin datos</div>':(()=>{const tMO=statsMec.reduce((s,m)=>s+m.manoObra,0),tRep=statsMec.reduce((s,m)=>s+m.repuestos,0);return`<div style="display:flex;gap:14px;margin-bottom:12px;font-size:12px"><span>🔧 Mano de obra: <strong style="color:#1D9E75">${fmt(tMO)}</strong></span><span>🔩 Repuestos: <strong>${fmt(tRep)}</strong></span></div>`+statsMec.map(m=>`<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:baseline"><span style="font-weight:500;font-size:13px">${esc(m.nombre)}</span><span style="font-weight:600;font-size:14px;color:#1D9E75">${fmt(m.manoObra)}</span></div><div style="display:flex;align-items:center;gap:8px"><div class="bar-wrap"><div class="bar-fill" style="width:${m.pct}%;background:#1D9E75"></div></div><span class="meta">${m.count} órdenes</span></div><div class="meta" style="margin-top:2px">Repuestos: ${fmt(m.repuestos)} · Total facturado: ${fmt(m.total)}</div></div>`).join('')})()}</div>
   <div class="card"><div class="card-header"><h2>Órdenes facturadas del mes</h2><button class="btn btn-sm" onclick="exportarCajaCSV()">⬇ CSV</button></div>${sMes.ordenes.length===0?'<div class="empty">Sin movimientos este mes</div>':sMes.ordenes.slice().reverse().map(o=>`<div class="work-item done" onclick="abrirOrden(${o.id})"><div style="display:flex;justify-content:space-between"><span style="font-size:13px">#${o.id} · ${esc(o.clienteNombre)}</span><span style="font-weight:500">${fmt(totalOrden(o))}</span></div><div class="meta">${fmtDate(o.fechaTerminado||o.creado)} · ${esc(o.bici.marca)} ${esc(o.bici.modelo)}</div></div>`).join('')}</div>`;
 }
 function statsMecanicos(){
   const now=new Date(),iniMes=new Date(now.getFullYear(),now.getMonth(),1);
   const ords=state.ordenes.filter(o=>(o.status==='done'||o.status==='delivered')&&new Date(o.fechaTerminado||o.creado)>=iniMes);
   const by={};
-  ords.forEach(o=>{const m=o.mecanico||'Sin asignar';if(!by[m])by[m]={nombre:m,count:0,total:0};by[m].count++;by[m].total+=totalOrden(o)});
-  const arr=Object.values(by).sort((a,b)=>b.total-a.total);
-  const max=Math.max(1,...arr.map(m=>m.total));
-  arr.forEach(m=>m.pct=Math.round(m.total/max*100));
+  ords.forEach(o=>{const m=o.mecanico||'Sin asignar';if(!by[m])by[m]={nombre:m,count:0,total:0,manoObra:0};by[m].count++;by[m].total+=totalOrden(o);by[m].manoObra+=manoObraOrden(o)});
+  const arr=Object.values(by).sort((a,b)=>b.manoObra-a.manoObra||b.total-a.total);
+  const max=Math.max(1,...arr.map(m=>m.manoObra));
+  arr.forEach(m=>{m.pct=Math.round(m.manoObra/max*100);m.repuestos=m.total-m.manoObra});
   return arr;
 }
 function csvEscape(v){const s=String(v==null?'':v);return/[",\n;]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
@@ -864,10 +867,11 @@ function exportarCajaCSV(){
   const now=new Date(),iniMes=new Date(now.getFullYear(),now.getMonth(),1);
   const ords=state.ordenes.filter(o=>(o.status==='done'||o.status==='delivered')&&new Date(o.fechaTerminado||o.creado)>=iniMes);
   if(!ords.length){toast('No hay órdenes facturadas este mes','error');return}
-  const headers=['Orden','Fecha terminada','Cliente','Teléfono','Marca','Modelo','Color','Mecánico','Tipo trabajo','Servicios','Total','Estado'];
-  const rows=ords.map(o=>[o.id,new Date(o.fechaTerminado||o.creado).toLocaleDateString('es-CO'),o.clienteNombre,o.clienteTel,o.bici.marca,o.bici.modelo,o.bici.color||'',o.mecanico,(o.tiposTrabajo||[]).join(' | '),(o.reparaciones||[]).filter(r=>r.desc).map(r=>`${r.desc} ($${r.precio})`).join(' | '),totalOrden(o),statusLabel(o.status)]);
+  const headers=['Orden','Fecha terminada','Cliente','Teléfono','Marca','Modelo','Color','Mecánico','Tipo trabajo','Servicios','Mano de obra','Repuestos','Total','Estado'];
+  const rows=ords.map(o=>{const mo=manoObraOrden(o),tot=totalOrden(o);return[o.id,new Date(o.fechaTerminado||o.creado).toLocaleDateString('es-CO'),o.clienteNombre,o.clienteTel,o.bici.marca,o.bici.modelo,o.bici.color||'',o.mecanico,(o.tiposTrabajo||[]).join(' | '),(o.reparaciones||[]).filter(r=>r.desc).map(r=>`${r.desc} ($${r.precio})`).join(' | '),mo,tot-mo,tot,statusLabel(o.status)]});
   const total=ords.reduce((s,o)=>s+totalOrden(o),0);
-  rows.push(['','','','','','','','','','TOTAL',total,'']);
+  const totalMO=ords.reduce((s,o)=>s+manoObraOrden(o),0);
+  rows.push(['','','','','','','','','','TOTAL',totalMO,total-totalMO,total,'']);
   const csv='\ufeff'+[headers,...rows].map(r=>r.map(csvEscape).join(',')).join('\r\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`veloce-caja-${now.toISOString().slice(0,7)}.csv`;a.click();URL.revokeObjectURL(url);toast(`${ords.length} órdenes exportadas`,'success');
 }
