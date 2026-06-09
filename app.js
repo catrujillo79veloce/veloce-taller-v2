@@ -734,10 +734,27 @@ function getAlertas(){
     if(o.status==='done'){const dias=Math.floor((ahora-new Date(o.fechaTerminado||o.creado))/86400000);if(dias>=3)al.push({tipo:'sinrecoger',orden:o,dias})}
   });return al;
 }
+function buildMensajeRecordatorio(o,tipo,dias){
+  if(tipo==='record45'){
+    return `Hola ${o.clienteNombre} 👋, te saludamos de *Veloce Bicicletas*. Vemos que tu *${o.bici.marca} ${o.bici.modelo}* tuvo su último servicio hace ${dias} días. Para mantenerla rodando como nueva, te recomendamos traerla a una revisión / mantenimiento. ¿Te ayudamos a agendar? 🚴`;
+  }
+  return `Hola ${o.clienteNombre} 👋, te recordamos que tu *${o.bici.marca} ${o.bici.modelo}* (Orden #${o.id}) ya está lista y te espera en *Veloce Bicicletas*. ¿Cuándo te queda bien pasar a recogerla? 🚴`;
+}
 function renderNotif(){
   const al=getAlertas(),div=document.getElementById('alertas-lista');
   if(!al.length){div.innerHTML=`<div class="card"><div class="empty">Sin alertas pendientes</div></div><div class="card"><div class="card-header"><h2>Recordatorios automáticos</h2></div><div style="font-size:13px;color:#888">A los 45 días del último servicio se genera el recordatorio de mantenimiento para WhatsApp.</div></div>`;return}
-  div.innerHTML=`<div class="card"><div class="card-header"><h2>Alertas (${al.length})</h2></div>${al.map(a=>`<div class="notif"><div style="flex:1">${a.tipo==='record45'?`<div style="font-weight:500;font-size:12px">Recordatorio — ${esc(a.orden.clienteNombre)}</div><div>Han pasado ${a.dias} días · Orden #${a.orden.id} · ${esc(a.orden.bici.marca)} ${esc(a.orden.bici.modelo)}</div><button class="btn btn-sm btn-primary" style="margin-top:6px" onclick="marcarRecordatorio(${a.orden.id})">Marcar enviado</button>`:`<div style="font-weight:500;font-size:12px">Sin recoger — ${esc(a.orden.clienteNombre)}</div><div>Orden #${a.orden.id} terminada hace ${a.dias} días</div><button class="btn btn-sm" style="margin-top:4px" onclick="abrirOrden(${a.orden.id})">Ver orden</button>`}</div></div>`).join('')}</div>`;
+  div.innerHTML=`<div class="card"><div class="card-header"><h2>Alertas (${al.length})</h2></div>${al.map(a=>{
+    const o=a.orden;const msg=buildMensajeRecordatorio(o,a.tipo,a.dias);
+    const tel=(o.clienteTel||'').replace(/\D/g,'');
+    const wa=tel?`<a class="btn btn-sm wa-btn" href="${waLink(o.clienteTel,msg)}" target="_blank" rel="noopener">📱 WhatsApp</a>`:`<span class="meta" style="color:#E24B4A">Sin teléfono registrado</span>`;
+    const titulo=a.tipo==='record45'
+      ?`<div style="font-weight:500;font-size:12px">🔧 Mantenimiento — ${esc(o.clienteNombre)}</div><div>Último servicio hace ${a.dias} días · Orden #${o.id} · ${esc(o.bici.marca)} ${esc(o.bici.modelo)}</div>`
+      :`<div style="font-weight:500;font-size:12px">📦 Sin recoger — ${esc(o.clienteNombre)}</div><div>Orden #${o.id} lista hace ${a.dias} días · ${esc(o.bici.marca)} ${esc(o.bici.modelo)}</div>`;
+    const extra=a.tipo==='record45'
+      ?`<button class="btn btn-sm" onclick="marcarRecordatorio(${o.id})">✓ Marcar enviado</button>`
+      :'';
+    return `<div class="notif"><div style="flex:1">${titulo}<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">${wa}<button class="btn btn-sm" onclick="abrirOrden(${o.id})">Ver orden</button>${extra}</div></div></div>`;
+  }).join('')}</div>`;
 }
 async function marcarRecordatorio(oid){try{await window.db.updateOrden(oid,{recordatorioEnviado:true});await refrescarVista()}catch(err){toast('Error: '+err.message,'error')}}
 
