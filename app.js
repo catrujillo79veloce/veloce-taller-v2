@@ -290,7 +290,7 @@ function renderOrdenesRecientes(){
   if(!recientes.length){div.innerHTML='';return}
   div.innerHTML=`<div class="card"><div class="card-header"><h2>Últimos ingresos</h2></div>${recientes.map(o=>`<div class="work-item ${o.status==='in-progress'?'in-progress':o.status==='done'?'done':''}" onclick="abrirOrden(${o.id})"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:500;font-size:13px">Orden #${o.id} · ${esc(o.bici.marca)} ${esc(o.bici.modelo)}</span><span class="status s-${o.status}">${statusLabel(o.status)}</span></div><div class="meta">${esc(o.clienteNombre)} · ${fmtDate(o.creado)} · ${esc((o.tiposTrabajo||[]).join(', '))}</div></div>`).join('')}</div>`;
 }
-function filtrarMec(f){mecFilter=f;document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['pending','in-progress','done','all'][i]===f));renderMecanico()}
+function filtrarMec(f){mecFilter=f;const order=['pending','in-progress','waiting-parts','done','all'];document.querySelectorAll('#view-mecanico .tab').forEach((t,i)=>t.classList.toggle('active',order[i]===f));renderMecanico()}
 function renderMecanico(){
   const div=document.getElementById('lista-mecanico');const cola=calcularCola();
   const prio={urgente:0,normal:1,espera:2};
