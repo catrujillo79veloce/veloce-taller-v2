@@ -39,7 +39,7 @@ create table ordenes (
   descripcion text default '',
   prioridad text default 'normal',
   mecanico text default 'Sin asignar',
-  status text default 'pending',
+  status text default 'pending' check (status in ('pending','in-progress','waiting-parts','done','delivered')),
   dia_programado date,
   reparaciones jsonb default '[]'::jsonb,
   notas text default '',
