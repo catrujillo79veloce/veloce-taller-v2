@@ -812,27 +812,27 @@ function imprimirRecibo(oid){
   const reps2 = reps.filter(r => r.desc || r.codigo || r.precio);
   const html=`<!DOCTYPE html><html><head><title>Recibo orden #${o.id}</title><style>
   *{box-sizing:border-box;margin:0;padding:0;font-family:'Arial Black','Helvetica',sans-serif;font-weight:700;color:#000}
-  @page{size:78mm auto;margin:0}
-  body{padding:3mm 12mm;color:#000;max-width:78mm;margin:0 auto;font-size:10px;line-height:1.3}
+  @page{size:80mm auto;margin:0}
+  html,body{width:70mm}
+  body{margin:0 auto;padding:2mm 4mm;color:#000;font-size:11px;line-height:1.32}
   .logo{text-align:center;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:6px}
-  .logo img{max-width:42mm;height:auto;display:block;margin:0 auto 3px}
+  .logo img{max-width:46mm;height:auto;display:block;margin:0 auto 3px}
   .logo p{font-size:9px;margin-top:2px;letter-spacing:.2px}
-  .row{display:flex;justify-content:space-between;margin-bottom:2px;gap:4px}
-  .row strong{min-width:42px;display:inline-block;flex-shrink:0}
-  h2{font-size:11px;margin:6px 0 3px;padding-bottom:2px;border-bottom:1px solid #000;text-transform:uppercase;letter-spacing:.2px}
-  .box{padding:3px 0;margin-bottom:5px;font-size:10px}
-  .total{display:flex;justify-content:space-between;font-size:13px;border-top:2px solid #000;padding-top:5px;margin-top:5px}
-  .footer{text-align:center;margin-top:12px;padding-top:6px;border-top:1px dashed #000;font-size:9px;line-height:1.4}
-  .orden-num{text-align:center;font-size:12px;margin:5px 0;border:2px solid #000;padding:4px;text-transform:uppercase;letter-spacing:.2px}
-  .srv-head{display:grid;grid-template-columns:13mm 1fr 14mm;gap:2px;font-size:9px;border-bottom:1px solid #000;padding-bottom:2px;margin-bottom:2px;text-transform:uppercase}
-  .srv-row{display:grid;grid-template-columns:13mm 1fr 14mm;gap:2px;font-size:10px;padding:2px 0;border-bottom:1px dotted #999;overflow-wrap:anywhere}
+  .row{display:flex;justify-content:space-between;gap:6px;margin-bottom:2px}
+  .row strong{flex-shrink:0}
+  .row span{text-align:right;overflow-wrap:anywhere;min-width:0}
+  h2{font-size:11px;margin:7px 0 3px;padding-bottom:2px;border-bottom:1px solid #000;text-transform:uppercase;letter-spacing:.2px}
+  .box{padding:3px 0;margin-bottom:5px;font-size:11px}
+  .total{display:flex;justify-content:space-between;font-size:14px;border-top:2px solid #000;padding-top:5px;margin-top:5px}
+  .footer{text-align:center;margin-top:12px;padding-top:6px;border-top:1px dashed #000;font-size:10px;line-height:1.4}
+  .orden-num{text-align:center;font-size:13px;margin:5px 0;border:2px solid #000;padding:4px;text-transform:uppercase;letter-spacing:.2px}
+  .srv-head{display:grid;grid-template-columns:12mm 1fr 13mm;gap:2px;font-size:9px;border-bottom:1px solid #000;padding-bottom:2px;margin-bottom:2px;text-transform:uppercase}
+  .srv-row{display:grid;grid-template-columns:12mm 1fr 13mm;gap:2px;font-size:10px;padding:2px 0;border-bottom:1px dotted #999;overflow-wrap:anywhere}
+  .srv-row .v,.srv-head .v{text-align:right}
   .tip{background:#fffae6;border:1px dashed #c08010;padding:6px;border-radius:4px;font-size:11px;font-family:sans-serif;margin-bottom:10px;color:#5a3d00}
-  @media print{.tip{display:none}}
-  .srv-row .v{text-align:right}
-  .srv-head .v{text-align:right}
-  @media print{body{padding:0;max-width:none}button{display:none}}
   .noprint{text-align:center;margin-top:14px}
   .btn-print{background:#111;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700;margin:0 3px;font-family:sans-serif}
+  @media print{.tip,.noprint{display:none}}
   </style></head><body>
   <div class="tip"><strong>Tip impresión TM-20:</strong> en el diálogo, selecciona "Más opciones" → Márgenes: <strong>Ninguno</strong> · Escala: <strong>100%</strong> · Tamaño papel: <strong>Roll Paper 80×297</strong>.</div>
   <div class="logo"><img src="${logoUrl}" alt="Veloce"><p>TALLER ESPECIALIZADO · MEDELLÍN</p></div>
