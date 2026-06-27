@@ -557,10 +557,10 @@ function _cleanupDrag(){
 // ===== Checklist =====
 function renderChecklist(o){
   const cl=o.checklist||{};
-  const pct5=['0%','25%','50%','75%','100%'],pct3=['0%','50%','100%'],nm=['4nm','5nm','6nm'];
+  const pct5=['0%','25%','50%','75%','100%'],nm=['4nm','5nm','6nm'];
   function pctRow(field,label,opts){return`<div class="cl-row"><span class="cl-label">${label}</span><div class="cl-opts">${opts.map(v=>`<button class="cl-btn ${cl[field]===v?'sel-'+v.replace('%',''):''}" onclick="setCL(${o.id},'${field}','${v}')">${v}</button>`).join('')}</div></div>`}
   function tqRow(field,label){return`<div class="torque-row"><span class="cl-label" style="font-size:12px">${label}</span><div class="torque-opts">${nm.map(v=>`<button class="tq-btn ${cl[field]===v?'sel':''}" onclick="setCL(${o.id},'${field}','${v}')">${v}</button>`).join('')}</div></div>`}
-  return`<div class="checklist-section"><div style="font-weight:500;font-size:13px;margin-bottom:10px">Checklist de estado</div>${pctRow('cadena','Cadena',pct5)}${pctRow('frenoDel','Pastillas freno delantero',pct5)}${pctRow('frenoTras','Pastillas freno trasero',pct5)}${pctRow('llantaDel','Llanta delantera',pct3)}${pctRow('llantaTras','Llanta trasera',pct3)}<div style="border-top:0.5px solid #e0e0e0;margin:10px 0;padding-top:10px"><div style="font-weight:500;font-size:12px;margin-bottom:8px;color:#888">Torques</div>${tqRow('torqueSillin','Tubo de sillín')}${tqRow('torqueEspiga','Espiga tija')}${tqRow('torqueManubrio','Espiga manubrio')}</div></div>`;
+  return`<div class="checklist-section"><div style="font-weight:500;font-size:13px;margin-bottom:10px">Checklist de estado</div>${pctRow('cadena','Cadena',pct5)}${pctRow('frenoDel','Pastillas freno delantero',pct5)}${pctRow('frenoTras','Pastillas freno trasero',pct5)}${pctRow('llantaDel','Llanta delantera',pct5)}${pctRow('llantaTras','Llanta trasera',pct5)}<div style="border-top:0.5px solid #e0e0e0;margin:10px 0;padding-top:10px"><div style="font-weight:500;font-size:12px;margin-bottom:8px;color:#888">Torques</div>${tqRow('torqueSillin','Tubo de sillín')}${tqRow('torqueEspiga','Espiga tija')}${tqRow('torqueManubrio','Espiga manubrio')}</div></div>`;
 }
 async function setCL(oid,field,val){
   const o=state.ordenes.find(o=>o.id===oid);if(!o)return;
