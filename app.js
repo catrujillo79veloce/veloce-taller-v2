@@ -192,20 +192,56 @@ function getTiposFinales(){
 
 // ===== Cliente / Bici en el form de asesor =====
 function buscarCliente(){
-  const id=document.getElementById('cli-id').value.trim();if(!id)return;
-  const cli=state.clientes.find(c=>c.id===id||c._cedula===id||c.nombre.toLowerCase().includes(id.toLowerCase()));
-  if(cli){
-    clienteActivo=cli;document.getElementById('cliente-encontrado').style.display='block';document.getElementById('form-nuevo-cliente').style.display='none';
-    document.getElementById('cliente-datos').innerHTML=clienteDatosHTML(cli);
-    if(cli.bicicletas&&cli.bicicletas.length>0){
-      document.getElementById('bici-select-div').style.display='block';
-      const sel=document.getElementById('bici-select');sel.innerHTML='<option value="">— Seleccionar bicicleta —</option>';
-      cli.bicicletas.forEach((b,i)=>sel.innerHTML+=`<option value="${i}">${esc(b.marca)} ${esc(b.modelo)}${b.color?' ('+esc(b.color)+')':''}</option>`);
-      sel.innerHTML+='<option value="nueva">+ Nueva bicicleta</option>';
-    }
-  }else{toast('Cliente no encontrado. Usa + Nuevo.','error')}
+  const raw=document.getElementById('cli-id').value.trim();if(!raw)return;
+  const q=raw.toLowerCase();
+  const qd=raw.replace(/\D/g,''); // dígitos, para celular / cédula
+  const matches=state.clientes.filter(c=>{
+    const nombre=(c.nombre||'').toLowerCase();
+    const tel=String(c.tel||'').replace(/\D/g,'');
+    const ced=String(c._cedula||'').replace(/\D/g,'');
+    if(nombre.includes(q))return true;
+    if(qd.length>=3&&(tel.includes(qd)||ced.includes(qd)))return true;
+    return String(c.id).toLowerCase()===q;
+  });
+  if(matches.length===0){toast('Cliente no encontrado. Usa + Nuevo.','error');return}
+  if(matches.length===1){seleccionarClienteEncontrado(matches[0]._uuid);return}
+  // Varios resultados: mostrar lista para elegir
+  document.getElementById('cliente-encontrado').style.display='block';
+  document.getElementById('form-nuevo-cliente').style.display='none';
+  document.getElementById('bici-select-div').style.display='none';
+  clienteActivo=null;biciActiva=null;
+  const vis=matches.slice(0,25);
+  document.getElementById('cliente-datos').innerHTML=`<div style="font-size:12px;color:#888;margin-bottom:6px">${matches.length} cliente(s) encontrado(s)${matches.length>vis.length?` · mostrando ${vis.length}, refina la búsqueda`:''} — selecciona:</div>`+
+    vis.map(c=>`<button class="btn btn-sm" style="display:block;width:100%;text-align:left;margin-bottom:4px" onclick="seleccionarClienteEncontrado('${jsStr(c._uuid)}')">${esc(c.nombre)} · ${esc(c.tel||'sin tel')}${c._cedula?' · CC '+esc(c._cedula):''}</button>`).join('');
 }
-function mostrarFormNuevoCliente(){document.getElementById('form-nuevo-cliente').style.display='block';document.getElementById('cliente-encontrado').style.display='none';document.getElementById('bici-select-div').style.display='none';clienteActivo=null;biciActiva=null}
+function seleccionarClienteEncontrado(uuid){
+  const cli=state.clientes.find(c=>c._uuid===uuid);if(!cli)return;
+  clienteActivo=cli;biciActiva=null;
+  document.getElementById('cliente-encontrado').style.display='block';
+  document.getElementById('form-nuevo-cliente').style.display='none';
+  document.getElementById('cliente-datos').innerHTML=clienteDatosHTML(cli);
+  const sel=document.getElementById('bici-select');
+  if(cli.bicicletas&&cli.bicicletas.length>0){
+    document.getElementById('bici-select-div').style.display='block';
+    sel.innerHTML='<option value="">— Seleccionar bicicleta —</option>';
+    cli.bicicletas.forEach((b,i)=>sel.innerHTML+=`<option value="${i}">${esc(b.marca)} ${esc(b.modelo)}${b.color?' ('+esc(b.color)+')':''}</option>`);
+    sel.innerHTML+='<option value="nueva">+ Nueva bicicleta</option>';
+  }else{
+    document.getElementById('bici-select-div').style.display='none';
+  }
+}
+function mostrarFormNuevoCliente(){
+  document.getElementById('form-nuevo-cliente').style.display='block';
+  document.getElementById('cliente-encontrado').style.display='none';
+  document.getElementById('bici-select-div').style.display='none';
+  clienteActivo=null;biciActiva=null;
+  // Prefill: si lo buscado tiene letras es un nombre; si son solo dígitos, una cédula
+  const q=document.getElementById('cli-id').value.trim();
+  if(q){
+    if(/[a-zA-Z]/.test(q)){if(!document.getElementById('cli-nombre').value)document.getElementById('cli-nombre').value=q}
+    else if(/^\d+$/.test(q)){if(!document.getElementById('cli-cedula').value)document.getElementById('cli-cedula').value=q}
+  }
+}
 function seleccionarBici(val){
   if(val===''||val==='nueva'){biciActiva=null;['bici-marca','bici-modelo','bici-color','bici-serie','bici-año'].forEach(id=>document.getElementById(id).value='');return}
   const b=clienteActivo.bicicletas[parseInt(val)];biciActiva=b;
@@ -215,7 +251,7 @@ function seleccionarBici(val){
 
 // ===== Crear orden =====
 async function crearIngreso(){
-  const idCli=document.getElementById('cli-id').value.trim(),nombre=document.getElementById('cli-nombre').value.trim(),tel=document.getElementById('cli-tel').value.trim(),email=document.getElementById('cli-email').value.trim();
+  const cedula=document.getElementById('cli-cedula').value.trim(),nombre=document.getElementById('cli-nombre').value.trim(),tel=document.getElementById('cli-tel').value.trim(),email=document.getElementById('cli-email').value.trim();
   const marca=document.getElementById('bici-marca').value.trim(),modelo=document.getElementById('bici-modelo').value.trim(),color=document.getElementById('bici-color').value.trim(),serie=document.getElementById('bici-serie').value.trim(),año=document.getElementById('bici-año').value.trim();
   const descripcion=document.getElementById('ing-descripcion').value.trim(),prioridad=document.getElementById('ing-prioridad').value,mecanico=document.getElementById('ing-mecanico').value;
   if(!marca||!modelo){toast('Ingresa marca y modelo','error');return}
@@ -228,7 +264,7 @@ async function crearIngreso(){
       clienteUuid=clienteActivo._uuid;
     }else{
       if(!nombre||!tel){toast('Ingresa nombre y teléfono','error');btn&&(btn.disabled=false,btn.textContent='Crear ingreso');return}
-      clienteUuid=await window.db.upsertCliente({cedula:idCli,nombre,tel,email});
+      clienteUuid=await window.db.upsertCliente({cedula,nombre,tel,email});
     }
     let biciUuid;
     if(biciActiva&&biciActiva._id){
@@ -283,7 +319,7 @@ function mostrarAccionesIngreso(oid){
 function copiarMensajeIngreso(){const el=document.getElementById('msg-ingreso');if(el){navigator.clipboard.writeText(el.value).then(()=>toast('Mensaje copiado','success')).catch(()=>{el.select();document.execCommand('copy');toast('Mensaje copiado','success')})}}
 
 function limpiarFormulario(){
-  ['cli-id','cli-nombre','cli-tel','cli-email','bici-marca','bici-modelo','bici-color','bici-serie','bici-año','ing-descripcion','otro-texto'].forEach(id=>document.getElementById(id).value='');
+  ['cli-id','cli-cedula','cli-nombre','cli-tel','cli-email','bici-marca','bici-modelo','bici-color','bici-serie','bici-año','ing-descripcion','otro-texto'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('form-nuevo-cliente').style.display='none';document.getElementById('cliente-encontrado').style.display='none';document.getElementById('bici-select-div').style.display='none';document.getElementById('otro-input-wrap').style.display='none';
   selectedTipos=[];initTipos();clienteActivo=null;biciActiva=null;fotosIngreso=[];renderFotosIngreso();
 }
@@ -876,7 +912,11 @@ function renderCaja(){
   const fmt=n=>'$ '+n.toLocaleString('es-CO');
   function card(titulo,stats,color){return`<div class="card" style="border-left:3px solid ${color}"><div class="meta" style="text-transform:uppercase;letter-spacing:.5px;font-size:10px">${titulo}</div><div style="font-size:22px;font-weight:500;margin:4px 0">${fmt(stats.total)}</div><div class="meta">${stats.count} orden(es)</div></div>`}
   const statsMec=statsMecanicos();
+  const meses=statsPorMes();const maxMes=Math.max(1,...meses.map(m=>m.total));
+  const nombreMes=m=>{const s=new Date(m.y,m.m,1).toLocaleDateString('es-CO',{month:'long',year:'numeric'});return s.charAt(0).toUpperCase()+s.slice(1)};
+  const mesesHTML=meses.length===0?'<div class="empty">Sin datos todavía</div>':meses.map(m=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px"><span style="font-weight:500;font-size:13px">${nombreMes(m)}${meses.length>1&&m.total===maxMes?' 👑':''}</span><span style="font-weight:600;font-size:14px;color:#D85A30">${fmt(m.total)}</span></div><div style="display:flex;align-items:center;gap:8px"><div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(m.total/maxMes*100)}%;background:#D85A30"></div></div><span class="meta">${m.count} órdenes · mano de obra ${fmt(m.manoObra)}</span></div></div>`).join('');
   div.innerHTML=`<div class="grid3">${card('Hoy',sHoy,'#1D9E75')}${card('Esta semana',sSem,'#185FA5')}${card('Este mes',sMes,'#D85A30')}</div>
+  <div class="card"><div class="card-header"><h2>Ingresos por mes</h2><span class="meta">${meses.length} mes(es)</span></div>${mesesHTML}</div>
   <div class="card"><div class="card-header"><h2>Pendientes de cobro</h2><span class="meta">${pendCobro.length} orden(es) · ${fmt(totalPendCobro)}</span></div>${pendCobro.length===0?'<div class="empty">Todo cobrado ✓</div>':pendCobro.map(o=>`<div class="work-item done" onclick="abrirOrden(${o.id})"><div style="display:flex;justify-content:space-between"><span style="font-weight:500;font-size:13px">#${o.id} · ${esc(o.clienteNombre)}</span><span style="font-weight:500">${fmt(totalOrden(o))}</span></div><div class="meta">${esc(o.bici.marca)} ${esc(o.bici.modelo)} · terminada ${fmtDate(o.fechaTerminado||o.creado)}</div></div>`).join('')}</div>
   <div class="card"><div class="card-header"><h2>Producción por mecánico</h2><span class="meta">Mano de obra y comisión · este mes</span></div>${statsMec.length===0?'<div class="empty">Sin datos</div>':(()=>{const tMO=statsMec.reduce((s,m)=>s+m.manoObra,0),tRep=statsMec.reduce((s,m)=>s+m.repuestos,0),tCom=statsMec.filter(m=>m.nombre!=='Sin asignar').reduce((s,m)=>s+m.comision,0);return`<div style="display:flex;gap:14px;margin-bottom:12px;font-size:12px;flex-wrap:wrap"><span>🔧 Mano de obra: <strong style="color:#1D9E75">${fmt(tMO)}</strong></span><span>🔩 Repuestos: <strong>${fmt(tRep)}</strong></span><span>💵 Comisión: <strong style="color:#D85A30">${fmt(tCom)}</strong></span></div>`+statsMec.map(m=>{const comHTML=m.nombre==='Sin asignar'?'':`<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:4px;padding-top:4px;border-top:0.5px dashed #e0e0e0"><span style="font-size:12px">💵 Comisión taller${m.comision>0?` <span style="color:#999;font-weight:400">(${m.manoObra>=7000000?'$7M':m.manoObra>=6000000?'$6M':'$5M'})</span>`:''}</span><strong style="font-size:13px;color:${m.comision>0?'#D85A30':'#bbb'}">${fmt(m.comision)}</strong></div>${m.proximo?`<div class="meta" style="margin-top:1px">Faltan ${fmt(m.proximo.min-m.manoObra)} para subir a ${fmt(m.proximo.com)}</div>`:'<div class="meta" style="margin-top:1px">Escalón máximo alcanzado 🎉</div>'}`;return`<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:baseline"><span style="font-weight:500;font-size:13px">${esc(m.nombre)}</span><span style="font-weight:600;font-size:14px;color:#1D9E75">${fmt(m.manoObra)}</span></div><div style="display:flex;align-items:center;gap:8px"><div class="bar-wrap"><div class="bar-fill" style="width:${m.pct}%;background:#1D9E75"></div></div><span class="meta">${m.count} órdenes</span></div><div class="meta" style="margin-top:2px">Repuestos: ${fmt(m.repuestos)} · Total facturado: ${fmt(m.total)}</div>${comHTML}</div>`}).join('')})()}</div>
   <div class="card"><div class="card-header"><h2>Órdenes facturadas del mes</h2><button class="btn btn-sm" onclick="exportarCajaCSV()">⬇ CSV</button></div>${sMes.ordenes.length===0?'<div class="empty">Sin movimientos este mes</div>':sMes.ordenes.slice().reverse().map(o=>`<div class="work-item done" onclick="abrirOrden(${o.id})"><div style="display:flex;justify-content:space-between"><span style="font-size:13px">#${o.id} · ${esc(o.clienteNombre)}</span><span style="font-weight:500">${fmt(totalOrden(o))}</span></div><div class="meta">${fmtDate(o.fechaTerminado||o.creado)} · ${esc(o.bici.marca)} ${esc(o.bici.modelo)}</div></div>`).join('')}</div>`;
@@ -890,6 +930,16 @@ function statsMecanicos(){
   const max=Math.max(1,...arr.map(m=>m.manoObra));
   arr.forEach(m=>{m.pct=Math.round(m.manoObra/max*100);m.repuestos=m.total-m.manoObra;m.comision=comisionTaller(m.manoObra);m.proximo=proximoEscalonComision(m.manoObra)});
   return arr;
+}
+function statsPorMes(){
+  const by={};
+  state.ordenes.filter(o=>o.status==='done'||o.status==='delivered').forEach(o=>{
+    const d=new Date(o.fechaTerminado||o.creado);if(isNaN(d))return;
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if(!by[key])by[key]={key,y:d.getFullYear(),m:d.getMonth(),total:0,count:0,manoObra:0};
+    by[key].total+=totalOrden(o);by[key].count++;by[key].manoObra+=manoObraOrden(o);
+  });
+  return Object.values(by).sort((a,b)=>b.key.localeCompare(a.key));
 }
 function csvEscape(v){const s=String(v==null?'':v);return/[",\n;]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
 function exportarCajaCSV(){

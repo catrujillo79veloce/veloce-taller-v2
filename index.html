@@ -76,10 +76,13 @@
     <div id="form-nuevo-cliente" style="display:none">
       <hr class="divider"><h3 style="margin-bottom:10px">Datos del cliente</h3>
       <div class="grid2">
+        <div class="section"><label>Cédula / ID <span style="color:#aaa;font-size:11px">(opcional)</span></label><input id="cli-cedula" type="text" inputmode="numeric" placeholder="1234567890"></div>
         <div class="section"><label>Nombre completo</label><input id="cli-nombre" type="text"></div>
-        <div class="section"><label>Teléfono / WhatsApp</label><input id="cli-tel" type="text" placeholder="3001234567"></div>
       </div>
-      <div class="section"><label>Email</label><input id="cli-email" type="email"></div>
+      <div class="grid2">
+        <div class="section"><label>Teléfono / WhatsApp</label><input id="cli-tel" type="text" inputmode="numeric" placeholder="3001234567"></div>
+        <div class="section"><label>Email <span style="color:#aaa;font-size:11px">(opcional)</span></label><input id="cli-email" type="email"></div>
+      </div>
     </div>
     <hr class="divider"><h3 style="margin-bottom:10px">Bicicleta</h3>
     <div id="bici-select-div" style="display:none" class="section">

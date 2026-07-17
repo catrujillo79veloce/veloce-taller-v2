@@ -82,6 +82,12 @@ alter table settings enable row level security;
 create policy "auth_all_clientes" on clientes for all to authenticated using (true) with check (true);
 create policy "auth_all_bicicletas" on bicicletas for all to authenticated using (true) with check (true);
 create policy "auth_all_ordenes" on ordenes for all to authenticated using (true) with check (true);
+-- Políticas de DELETE (la DB en producción tenía policies granulares sin DELETE en varias tablas)
+create policy "auth delete ordenes" on ordenes for delete to authenticated using (true);
+create policy "auth delete checklist" on checklist for delete to authenticated using (true);
+create policy "auth delete clientes" on clientes for delete to authenticated using (true);
+create policy "auth delete bicicletas" on bicicletas for delete to authenticated using (true);
+create policy "auth delete consignaciones" on consignaciones for delete to authenticated using (true);
 create policy "auth_all_settings" on settings for all to authenticated using (true) with check (true);
 
 -- ===== STORAGE =====
