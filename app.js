@@ -2,6 +2,7 @@
 // Veloce Taller — App principal (Supabase backend)
 // ========================================================
 
+const APP_VERSION='v22'; // debe coincidir con la versión del service worker (sw.js)
 const TIPOS_TRABAJO=['Mantenimiento ruta/MTB','Mantenimiento ebike','Mantenimiento suspensión','Alistada','Lavada','Encerar cadena','Parchada','Cambio de llanta','Cambio de neumático','Armada','Desarmada','Otro'];
 const HORARIO_TALLER={0:[],1:[[600,720],[780,1140]],2:[[600,720],[780,1140]],3:[[660,780],[840,1140]],4:[[600,720],[780,1140]],5:[[600,720],[780,1140]],6:[[660,1020]]};
 const DURACION_MIN={'Mantenimiento':180,'Mantenimiento ruta/MTB':180,'Mantenimiento ebike':240,'Mantenimiento suspensión':180,'Lavada':20,'Alistada':90,'Encerar cadena':30,'Parchada':30,'Cambio de llanta':30,'Cambio de neumático':30,'Armada':120,'Desarmada':90};
@@ -180,7 +181,7 @@ async function bootApp(){
   try{
     await reloadState();
     const session=await window.auth.getSession();
-    document.getElementById('user-email').textContent=session?.user?.email||'';
+    document.getElementById('user-email').textContent=(session?.user?.email||'')+' · '+APP_VERSION;
     document.getElementById('loading-screen').style.display='none';
     document.getElementById('app').style.display='block';
     initTipos();refreshMecanicoSelects();updateBadges();renderOrdenesRecientes();
@@ -1234,7 +1235,19 @@ async function eliminarConsignacion(id){
 }
 
 // ===== PWA =====
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}
+// Auto-actualización: cuando se publica una versión nueva, el SW nuevo toma control y la app se recarga sola con código fresco
+if('serviceWorker' in navigator){
+  let _swRefreshing=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(_swRefreshing)return;_swRefreshing=true;location.reload();
+  });
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      reg.update().catch(()=>{});
+      document.addEventListener('visibilitychange',()=>{if(!document.hidden)reg.update().catch(()=>{})});
+    }).catch(()=>{});
+  });
+}
 
 // ===== Init =====
 init();
