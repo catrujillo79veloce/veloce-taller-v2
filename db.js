@@ -78,7 +78,8 @@ function adaptOrden(row, cliente, bici, repuestos, checklist){
     fechaCompromiso: row.fecha_compromiso,
     diaProgramado: row.dia_programado || null,
     duracionMinutos: row.duracion_minutos,
-    recordatorioEnviado: row.recordatorio_enviado
+    recordatorioEnviado: row.recordatorio_enviado,
+    esPremioFidelidad: !!row.es_premio_fidelidad
   };
 }
 
@@ -255,6 +256,7 @@ async function dbUpdateOrden(oid, patches){
   if(patches.fechaTerminado !== undefined) dbPatch.fecha_terminado = patches.fechaTerminado;
   if(patches.fechaCompromiso !== undefined) dbPatch.fecha_compromiso = patches.fechaCompromiso;
   if(patches.diaProgramado !== undefined) dbPatch.dia_programado = patches.diaProgramado;
+  if(patches.esPremioFidelidad !== undefined) dbPatch.es_premio_fidelidad = patches.esPremioFidelidad;
   if(patches.duracionMinutos !== undefined) dbPatch.duracion_minutos = patches.duracionMinutos;
   if(patches.recordatorioEnviado !== undefined) dbPatch.recordatorio_enviado = patches.recordatorioEnviado;
   if(patches.fotos !== undefined) dbPatch.fotos = patches.fotos;

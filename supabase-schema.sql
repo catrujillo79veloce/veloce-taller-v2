@@ -42,6 +42,7 @@ create table ordenes (
   mecanico text default 'Sin asignar',
   status text default 'pending' check (status in ('pending','in-progress','waiting-parts','done','delivered')),
   dia_programado date,
+  es_premio_fidelidad boolean not null default false, -- la alistada gratis de fidelidad (no suma sello)
   reparaciones jsonb default '[]'::jsonb,
   notas text default '',
   fotos text[] default array[]::text[],

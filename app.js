@@ -32,14 +32,19 @@ function proximoEscalonComision(manoObra){return COMISION_ESCALONES.find(t=>mano
 const SELLOS_META=5;
 function ordenCalificaFidelidad(o){return (o.tiposTrabajo||[]).some(t=>{const s=String(t||'').trim().toLowerCase();return s.startsWith('mantenimiento')||s.startsWith('alistada')})}
 function fidelidadCliente(uuid){
-  if(!uuid)return{sellos:0,canjeadas:0,ganadas:0,disponibles:0,progreso:0,faltan:SELLOS_META};
+  if(!uuid)return{sellos:0,redenciones:0,ganadas:0,disponibles:0,progreso:0,faltan:SELLOS_META};
   const cli=state.clientes.find(c=>c._uuid===uuid);
-  const sellos=state.ordenes.filter(o=>o._clienteUuid===uuid&&(o.status==='done'||o.status==='delivered')&&ordenCalificaFidelidad(o)).length;
-  const canjeadas=cli?cli.alistadasCanjeadas||0:0;
+  const mias=state.ordenes.filter(o=>o._clienteUuid===uuid);
+  // Sellos: servicios terminados que califican y que NO son la alistada de premio
+  const sellos=mias.filter(o=>(o.status==='done'||o.status==='delivered')&&ordenCalificaFidelidad(o)&&!o.esPremioFidelidad).length;
+  // Redenciones: órdenes marcadas como premio + contador legado (canjes viejos antes de este modelo)
+  const premiosOrden=mias.filter(o=>o.esPremioFidelidad).length;
+  const canjeadasLegado=cli?cli.alistadasCanjeadas||0:0;
+  const redenciones=premiosOrden+canjeadasLegado;
   const ganadas=Math.floor(sellos/SELLOS_META);
-  const disponibles=Math.max(0,ganadas-canjeadas);
-  const progreso=canjeadas>ganadas?0:sellos%SELLOS_META; // si se borraron órdenes ya premiadas, no sobreestimar
-  return {sellos,canjeadas,ganadas,disponibles,progreso,faltan:disponibles>0?0:(SELLOS_META-progreso)};
+  const disponibles=Math.max(0,ganadas-redenciones);
+  const progreso=redenciones>ganadas?0:sellos%SELLOS_META;
+  return {sellos,redenciones,ganadas,disponibles,progreso,faltan:disponibles>0?0:(SELLOS_META-progreso)};
 }
 // Línea de fidelidad para los mensajes de WhatsApp (coherente: premio por reclamar vs progreso)
 function lineaFidelidad(uuid){
@@ -49,31 +54,51 @@ function lineaFidelidad(uuid){
 }
 function fidelidadHTML(uuid,opts){
   opts=opts||{};const f=fidelidadCliente(uuid);
+  // Contexto de orden: permite marcar/quitar esta orden como la alistada de premio
+  if(opts.orden!=null){
+    const o=state.ordenes.find(x=>x.id===opts.orden);
+    if(o&&o.esPremioFidelidad){
+      return `<div class="fidelidad-box fidelidad-premio"><span>🎁 <strong>Esta orden es la ALISTADA GRATIS (no suma sello)</strong></span><button class="btn btn-sm" onclick="event.stopPropagation();quitarPremioOrden(${o.id})">Quitar</button></div>`;
+    }
+    if(f.disponibles>0){
+      return `<div class="fidelidad-box fidelidad-premio"><span>🎁 <strong>${f.disponibles} alistada${f.disponibles>1?'s':''} GRATIS disponible${f.disponibles>1?'s':''}</strong></span><button class="btn btn-sm" onclick="event.stopPropagation();aplicarPremioOrden(${o.id})">Aplicar a esta orden</button></div>`;
+    }
+  }
   if(f.disponibles>0){
-    return `<div class="fidelidad-box fidelidad-premio"><span>🎁 <strong>${f.disponibles} alistada${f.disponibles>1?'s':''} GRATIS disponible${f.disponibles>1?'s':''}</strong></span>${opts.canjear?`<button class="btn btn-sm" onclick="event.stopPropagation();canjearAlistada('${jsStr(uuid)}')">Canjear</button>`:''}</div>`;
+    return `<div class="fidelidad-box fidelidad-premio"><span>🎁 <strong>${f.disponibles} alistada${f.disponibles>1?'s':''} GRATIS disponible${f.disponibles>1?'s':''}</strong></span><span class="meta">Aplícala en la orden</span></div>`;
   }
   const dots='●'.repeat(f.progreso)+'○'.repeat(SELLOS_META-f.progreso);
   return `<div class="fidelidad-box"><span>🎟️ Fidelidad <strong>${f.progreso}/${SELLOS_META}</strong> · faltan ${f.faltan}</span><span class="fid-dots">${dots}</span></div>`;
 }
-let _canjeando=false;
-async function canjearAlistada(uuid){
-  if(_canjeando)return;
-  const cli=state.clientes.find(c=>c._uuid===uuid);if(!cli)return;
-  if(fidelidadCliente(uuid).disponibles<=0){toast('No hay alistada gratis disponible','error');return}
-  if(!confirm('¿Canjear 1 alistada gratis? Recuerda aplicarla como Alistada a $0 en la orden.'))return;
-  _canjeando=true;
+function refrescarFidelidadUI(uuid){
+  const mf=document.getElementById('modal-fidelidad');
+  if(mf&&_ordenAbierta!=null){const o=state.ordenes.find(x=>x.id===_ordenAbierta);if(o)mf.innerHTML=fidelidadHTML(o._clienteUuid,{orden:o.id})}
+  if(currentView==='historial')renderHistorial();
+  const cdat=document.getElementById('cliente-datos');if(cdat&&clienteActivo&&clienteActivo._uuid===uuid)cdat.innerHTML=clienteDatosHTML(clienteActivo);
+}
+let _premioBusy=false;
+async function aplicarPremioOrden(oid){
+  if(_premioBusy)return;
+  const o=state.ordenes.find(x=>x.id===oid);if(!o)return;
+  if(fidelidadCliente(o._clienteUuid).disponibles<=0){toast('No hay alistada gratis disponible','error');return}
+  if(!confirm('¿Marcar esta orden como la ALISTADA GRATIS de fidelidad? No sumará sello. Recuerda dejar la Alistada en $0.'))return;
+  _premioBusy=true;
   try{
-    const nuevo=(cli.alistadasCanjeadas||0)+1;
-    await window.db.updateClienteByUuid(uuid,{alistadasCanjeadas:nuevo});
-    cli.alistadasCanjeadas=nuevo;
-    toast('🎁 Alistada gratis canjeada','success');
-    // Actualiza SOLO la caja de fidelidad (no re-renderiza el modal, para no perder ediciones sin guardar)
-    const mf=document.getElementById('modal-fidelidad');
-    if(mf&&_ordenAbierta!=null){const o=state.ordenes.find(x=>x.id===_ordenAbierta);if(o)mf.innerHTML=fidelidadHTML(o._clienteUuid,{canjear:true})}
-    if(currentView==='historial')renderHistorial();
-    const cdat=document.getElementById('cliente-datos');if(cdat&&clienteActivo&&clienteActivo._uuid===uuid)cdat.innerHTML=clienteDatosHTML(clienteActivo);
+    await window.db.updateOrden(oid,{esPremioFidelidad:true});
+    o.esPremioFidelidad=true;
+    toast('🎁 Alistada gratis aplicada','success');
+    refrescarFidelidadUI(o._clienteUuid);
   }catch(err){toast('Error: '+err.message,'error')}
-  finally{_canjeando=false}
+  finally{_premioBusy=false}
+}
+async function quitarPremioOrden(oid){
+  const o=state.ordenes.find(x=>x.id===oid);if(!o)return;
+  try{
+    await window.db.updateOrden(oid,{esPremioFidelidad:false});
+    o.esPremioFidelidad=false;
+    toast('Premio de fidelidad quitado','info');
+    refrescarFidelidadUI(o._clienteUuid);
+  }catch(err){toast('Error: '+err.message,'error')}
 }
 function duracionTipo(t){if(DURACION_MIN[t]!=null)return DURACION_MIN[t];if(t&&t.startsWith('Otro'))return 30;return 30}
 function duracionOrden(o){return(o.tiposTrabajo||[]).reduce((s,t)=>s+duracionTipo(t),0)}
@@ -352,7 +377,8 @@ function buildMensajeIngreso(o){
   if(o.duracionMinutos)msg+=`⏱ *Duración estimada:* ${fmtDur(o.duracionMinutos)}\n`;
   if(o.fechaCompromiso)msg+=`📅 *Entrega estimada:* ${fmtFechaHora(new Date(o.fechaCompromiso))}\n`;
   if(o.descripcion)msg+=`\n📝 *Observaciones:* ${o.descripcion}\n`;
-  msg+=`\n${lineaFidelidad(o._clienteUuid)}\n`;
+  if(o.esPremioFidelidad)msg+=`\n🎁 *¡Esta alistada va GRATIS por tu fidelidad!* Gracias por seguir rodando con Veloce 🚲\n`;
+  else msg+=`\n${lineaFidelidad(o._clienteUuid)}\n`;
   msg+=`\nTe avisaremos apenas esté lista. ¡Gracias por confiar en nosotros! 🚴`;
   return msg;
 }
@@ -715,7 +741,7 @@ function abrirOrden(id){
   const dur=duracionOrden(o);
   const compromisoTxt=o.fechaCompromiso?`<span class="meta">📅 Compromiso: ${fmtFechaHora(new Date(o.fechaCompromiso))}</span>`:'';
   const entregaActual=entry?`<span class="meta" style="color:#185FA5">🔄 Estimación actual: ${fmtFechaHora(entry.fin)}</span>`:'';
-  document.getElementById('modal-contenido').innerHTML=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center"><span class="status s-${o.status}">${statusLabel(o.status)}</span><span class="meta">Ingresó: ${fmtDate(o.creado)}</span><span class="meta">⏱ ${fmtDur(dur)}</span>${compromisoTxt}${entregaActual}</div><div class="cliente-info" id="modal-cliente-info">${clienteInfoModalHTML(o)}</div><div id="modal-fidelidad">${fidelidadHTML(o._clienteUuid,{canjear:true})}</div><div class="grid2"><div class="section"><label>Mecánico</label><select id="edit-mec-${o.id}">${renderMecanicoOptions(o.mecanico)}</select></div><div class="section"><label>Prioridad</label><select id="edit-prio-${o.id}">${prioOpts.map(p=>`<option value="${p}" ${o.prioridad===p?'selected':''}>${p}</option>`).join('')}</select></div></div><div style="margin-bottom:8px"><span style="font-size:12px;font-weight:500;color:#888">Tipo de trabajo: </span><span style="font-size:12px">${esc((o.tiposTrabajo||[]).join(' · '))}</span></div><div class="section"><label>Descripción / observaciones</label><textarea id="edit-desc-${o.id}">${esc(o.descripcion||'')}</textarea></div><div class="section"><label>Fotos</label>${renderFotosOrden(o)}</div><hr class="divider"><div id="cl-wrap-${o.id}">${renderChecklist(o)}</div><hr class="divider"><h3 style="margin-bottom:8px">Trabajo realizado y repuestos</h3><div id="reps-list-${o.id}">${reps.map((r,i)=>`<div class="repair-row"><input value="${esc(r.codigo||'')}" placeholder="SKU" id="rep-c-${o.id}-${i}" style="flex:1;min-width:70px;max-width:110px"><input value="${esc(r.desc)}" placeholder="Servicios y repuestos" id="rep-d-${o.id}-${i}" style="flex:2" oninput="recalcTotal(${o.id})"><input value="${esc(r.precio)}" type="number" placeholder="$ Valor" id="rep-p-${o.id}-${i}" style="flex:1;min-width:80px" oninput="recalcTotal(${o.id})"><button class="btn btn-sm" onclick="eliminarRep(${o.id},${i})">✕</button></div>`).join('')}</div><button class="btn btn-sm" onclick="agregarRep(${o.id})" style="margin-bottom:8px">+ Agregar línea</button><div class="total-box"><span style="font-weight:500;font-size:14px">Total orden</span><span style="font-size:18px;font-weight:500" id="total-${o.id}">$ ${total.toLocaleString('es-CO')}</span></div><hr class="divider"><div class="section"><label>Notas internas del mecánico</label><textarea id="notas-${o.id}">${esc(o.notas||'')}</textarea></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn" onclick="guardarOrden(${o.id})">💾 Guardar</button>${o.status==='pending'?`<button class="btn btn-primary" onclick="iniciarOrden(${o.id})">▶ Iniciar trabajo</button>`:''} ${o.status==='in-progress'?`<button class="btn" onclick="pausarOrden(${o.id})">⏸ Volver a pendiente</button>`:''} ${(o.status==='pending'||o.status==='in-progress')?`<button class="btn" onclick="cambiarEstadoOrden(${o.id},'waiting-parts',{cerrar:true,guardar:true})">📦 Esperando repuesto</button>`:''} ${o.status==='waiting-parts'?`<button class="btn btn-primary" onclick="cambiarEstadoOrden(${o.id},'in-progress',{cerrar:true,guardar:true})">▶ Reanudar trabajo</button>`:''} ${o.status!=='done'&&o.status!=='delivered'?`<button class="btn btn-success" onclick="terminarOrden(${o.id})">✓ Terminar y notificar</button>`:''} ${o.status==='done'?`<button class="btn" onclick="marcarEntregada(${o.id})">📦 Marcar entregada</button>`:''} ${o.status==='done'||o.status==='delivered'?`<button class="btn btn-sm" onclick="verReporte(${o.id})">Ver reporte</button>`:''} <button class="btn btn-sm" onclick="imprimirRecibo(${o.id})">🖨 Imprimir</button> <button class="btn btn-sm" onclick="mostrarAccionesIngreso(${o.id})">📱 WhatsApp ingreso</button> <button class="btn btn-sm" style="margin-left:auto;color:#E24B4A;border-color:#E24B4A" onclick="eliminarOrden(${o.id})">🗑 Eliminar</button></div>`;
+  document.getElementById('modal-contenido').innerHTML=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center"><span class="status s-${o.status}">${statusLabel(o.status)}</span><span class="meta">Ingresó: ${fmtDate(o.creado)}</span><span class="meta">⏱ ${fmtDur(dur)}</span>${compromisoTxt}${entregaActual}</div><div class="cliente-info" id="modal-cliente-info">${clienteInfoModalHTML(o)}</div><div id="modal-fidelidad">${fidelidadHTML(o._clienteUuid,{orden:o.id})}</div><div class="grid2"><div class="section"><label>Mecánico</label><select id="edit-mec-${o.id}">${renderMecanicoOptions(o.mecanico)}</select></div><div class="section"><label>Prioridad</label><select id="edit-prio-${o.id}">${prioOpts.map(p=>`<option value="${p}" ${o.prioridad===p?'selected':''}>${p}</option>`).join('')}</select></div></div><div style="margin-bottom:8px"><span style="font-size:12px;font-weight:500;color:#888">Tipo de trabajo: </span><span style="font-size:12px">${esc((o.tiposTrabajo||[]).join(' · '))}</span></div><div class="section"><label>Descripción / observaciones</label><textarea id="edit-desc-${o.id}">${esc(o.descripcion||'')}</textarea></div><div class="section"><label>Fotos</label>${renderFotosOrden(o)}</div><hr class="divider"><div id="cl-wrap-${o.id}">${renderChecklist(o)}</div><hr class="divider"><h3 style="margin-bottom:8px">Trabajo realizado y repuestos</h3><div id="reps-list-${o.id}">${reps.map((r,i)=>`<div class="repair-row"><input value="${esc(r.codigo||'')}" placeholder="SKU" id="rep-c-${o.id}-${i}" style="flex:1;min-width:70px;max-width:110px"><input value="${esc(r.desc)}" placeholder="Servicios y repuestos" id="rep-d-${o.id}-${i}" style="flex:2" oninput="recalcTotal(${o.id})"><input value="${esc(r.precio)}" type="number" placeholder="$ Valor" id="rep-p-${o.id}-${i}" style="flex:1;min-width:80px" oninput="recalcTotal(${o.id})"><button class="btn btn-sm" onclick="eliminarRep(${o.id},${i})">✕</button></div>`).join('')}</div><button class="btn btn-sm" onclick="agregarRep(${o.id})" style="margin-bottom:8px">+ Agregar línea</button><div class="total-box"><span style="font-weight:500;font-size:14px">Total orden</span><span style="font-size:18px;font-weight:500" id="total-${o.id}">$ ${total.toLocaleString('es-CO')}</span></div><hr class="divider"><div class="section"><label>Notas internas del mecánico</label><textarea id="notas-${o.id}">${esc(o.notas||'')}</textarea></div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn" onclick="guardarOrden(${o.id})">💾 Guardar</button>${o.status==='pending'?`<button class="btn btn-primary" onclick="iniciarOrden(${o.id})">▶ Iniciar trabajo</button>`:''} ${o.status==='in-progress'?`<button class="btn" onclick="pausarOrden(${o.id})">⏸ Volver a pendiente</button>`:''} ${(o.status==='pending'||o.status==='in-progress')?`<button class="btn" onclick="cambiarEstadoOrden(${o.id},'waiting-parts',{cerrar:true,guardar:true})">📦 Esperando repuesto</button>`:''} ${o.status==='waiting-parts'?`<button class="btn btn-primary" onclick="cambiarEstadoOrden(${o.id},'in-progress',{cerrar:true,guardar:true})">▶ Reanudar trabajo</button>`:''} ${o.status!=='done'&&o.status!=='delivered'?`<button class="btn btn-success" onclick="terminarOrden(${o.id})">✓ Terminar y notificar</button>`:''} ${o.status==='done'?`<button class="btn" onclick="marcarEntregada(${o.id})">📦 Marcar entregada</button>`:''} ${o.status==='done'||o.status==='delivered'?`<button class="btn btn-sm" onclick="verReporte(${o.id})">Ver reporte</button>`:''} <button class="btn btn-sm" onclick="imprimirRecibo(${o.id})">🖨 Imprimir</button> <button class="btn btn-sm" onclick="mostrarAccionesIngreso(${o.id})">📱 WhatsApp ingreso</button> <button class="btn btn-sm" style="margin-left:auto;color:#E24B4A;border-color:#E24B4A" onclick="eliminarOrden(${o.id})">🗑 Eliminar</button></div>`;
   document.getElementById('modal-orden').style.display='block';
 }
 function recalcTotal(oid){const o=state.ordenes.find(o=>o.id===oid);if(!o)return;const total=(o.reparaciones||[]).reduce((s,_,i)=>s+(parseFloat(document.getElementById(`rep-p-${oid}-${i}`)?.value)||0),0);const el=document.getElementById('total-'+oid);if(el)el.textContent='$ '+total.toLocaleString('es-CO')}
@@ -757,7 +783,8 @@ function buildMensajeCliente(o){
   }
   if([cl.torqueSillin,cl.torqueEspiga,cl.torqueManubrio].some(Boolean)){msg+=`🔩 *Torques aplicados:*\n`;if(cl.torqueSillin)msg+=`• Tubo de sillín: ${cl.torqueSillin}\n`;if(cl.torqueEspiga)msg+=`• Espiga tija: ${cl.torqueEspiga}\n`;if(cl.torqueManubrio)msg+=`• Espiga manubrio: ${cl.torqueManubrio}\n`;msg+=`\n`}
   if(o.notas)msg+=`💬 *Nota del mecánico:* ${o.notas}\n\n`;
-  msg+=`${lineaFidelidad(o._clienteUuid)}\n\n`;
+  if(o.esPremioFidelidad)msg+=`🎁 *¡Esta alistada fue GRATIS por tu fidelidad!* Gracias por seguir rodando con Veloce 🚲\n\n`;
+  else msg+=`${lineaFidelidad(o._clienteUuid)}\n\n`;
   msg+=`¡Te esperamos en el taller para que la recojas! 🚴‍♂️\n\n`;
   msg+=`⚠️ *Nota:* A partir del tercer día después de finalizado el servicio, se cobrarán *$1.500 pesos diarios* por concepto de bodegaje.`;
   return msg;
@@ -777,10 +804,10 @@ function buscarHistorial(){
   const q=(document.getElementById('hist-search')?.value||'').toLowerCase();const div=document.getElementById('hist-resultados');
   const clientes=q?state.clientes.filter(c=>c.nombre.toLowerCase().includes(q)||String(c.id).toLowerCase().includes(q)||String(c.tel||'').toLowerCase().includes(q)||(c.bicicletas||[]).some(b=>(b.marca+' '+b.modelo+' '+(b.color||'')+' '+(b.serie||'')).toLowerCase().includes(q))):state.clientes;
   if(!clientes.length){div.innerHTML='<div class="empty">Sin resultados</div>';return}
-  div.innerHTML=clientes.map(cli=>{const ords=state.ordenes.filter(o=>o._clienteUuid===cli._uuid);const cid=encodeURIComponent(cli.id);return`<div class="card"><div class="card-header"><div style="cursor:pointer;flex:1" onclick="toggleHist('hc-${cid}')"><h3>${esc(cli.nombre)}</h3><div class="meta">${esc(cli.tel)} · ${ords.length} servicio(s)</div></div><div style="display:flex;gap:4px"><a class="btn btn-sm wa-btn" href="${waLink(cli.tel,'Hola '+cli.nombre)}" target="_blank" rel="noopener" style="padding:2px 8px;font-size:11px">📱</a><button class="btn btn-sm" onclick="editarCliente('${jsStr(cli.id)}')">✏ Editar</button><button class="btn btn-sm" style="color:#E24B4A;border-color:#E24B4A" onclick="eliminarCliente('${jsStr(cli.id)}')">🗑</button></div></div>${fidelidadHTML(cli._uuid,{canjear:true})}<div id="hc-${cid}" style="display:none"><hr class="divider">${(cli.bicicletas||[]).map((b,bi)=>{const bo=ords.filter(o=>o._biciUuid===b._id);return`<div class="hist-bici"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-weight:500;font-size:13px">${esc(b.marca)} ${esc(b.modelo)}${b.color?' · '+esc(b.color):''}${b.año?' ('+esc(b.año)+')':''}</div><button class="btn btn-sm" style="color:#E24B4A;border-color:#E24B4A;padding:2px 6px" onclick="eliminarBici('${b._id}')">🗑</button></div>${bo.map(o=>`<div class="hist-entry"><div style="display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:500">#${o.id} · ${fmtDate(o.creado)}</span><span class="status s-${o.status}">${statusLabel(o.status)}</span></div><div class="meta">${esc((o.tiposTrabajo||[]).join(', '))}</div>${o.reparaciones&&o.reparaciones.length?`<div class="meta">${esc(o.reparaciones.map(r=>r.desc).filter(Boolean).join(', '))}</div>`:''}<button class="btn btn-sm" style="margin-top:4px" onclick="abrirOrden(${o.id})">Ver detalle</button></div>`).join('')}</div>`}).join('')}</div></div>`}).join('');
+  div.innerHTML=clientes.map(cli=>{const ords=state.ordenes.filter(o=>o._clienteUuid===cli._uuid);const cid=encodeURIComponent(cli.id);return`<div class="card"><div class="card-header"><div style="cursor:pointer;flex:1" onclick="toggleHist('hc-${cid}')"><h3>${esc(cli.nombre)}</h3><div class="meta">${esc(cli.tel)} · ${ords.length} servicio(s)</div></div><div style="display:flex;gap:4px"><a class="btn btn-sm wa-btn" href="${waLink(cli.tel,'Hola '+cli.nombre)}" target="_blank" rel="noopener" style="padding:2px 8px;font-size:11px">📱</a><button class="btn btn-sm" onclick="editarCliente('${jsStr(cli.id)}')">✏ Editar</button><button class="btn btn-sm" style="color:#E24B4A;border-color:#E24B4A" onclick="eliminarCliente('${jsStr(cli.id)}')">🗑</button></div></div>${fidelidadHTML(cli._uuid)}<div id="hc-${cid}" style="display:none"><hr class="divider">${(cli.bicicletas||[]).map((b,bi)=>{const bo=ords.filter(o=>o._biciUuid===b._id);return`<div class="hist-bici"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-weight:500;font-size:13px">${esc(b.marca)} ${esc(b.modelo)}${b.color?' · '+esc(b.color):''}${b.año?' ('+esc(b.año)+')':''}</div><button class="btn btn-sm" style="color:#E24B4A;border-color:#E24B4A;padding:2px 6px" onclick="eliminarBici('${b._id}')">🗑</button></div>${bo.map(o=>`<div class="hist-entry"><div style="display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:500">#${o.id} · ${fmtDate(o.creado)}</span><span class="status s-${o.status}">${statusLabel(o.status)}</span></div><div class="meta">${esc((o.tiposTrabajo||[]).join(', '))}</div>${o.reparaciones&&o.reparaciones.length?`<div class="meta">${esc(o.reparaciones.map(r=>r.desc).filter(Boolean).join(', '))}</div>`:''}<button class="btn btn-sm" style="margin-top:4px" onclick="abrirOrden(${o.id})">Ver detalle</button></div>`).join('')}</div>`}).join('')}</div></div>`}).join('');
 }
 function clienteInfoModalHTML(o){return `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap"><div><strong>${esc(o.clienteNombre)}</strong> · ${esc(o.clienteTel)}</div><div style="display:flex;gap:4px"><button class="btn btn-sm" style="padding:2px 8px;font-size:11px" onclick="editarClienteDeOrden(${o.id})">✏ Editar cliente</button><a class="btn btn-sm wa-btn" style="padding:2px 8px;font-size:11px" href="${waLink(o.clienteTel,'Hola '+o.clienteNombre)}" target="_blank" rel="noopener">📱 WhatsApp</a></div></div>`}
-function clienteDatosHTML(cli){return `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap"><div><strong>${esc(cli.nombre)}</strong> · ${esc(cli.tel)}${cli.email?' · '+esc(cli.email):''}</div><button class="btn btn-sm" style="padding:2px 8px;font-size:11px" onclick="editarCliente('${jsStr(cli.id)}')">✏ Editar datos</button></div>${fidelidadHTML(cli._uuid,{canjear:true})}`}
+function clienteDatosHTML(cli){return `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap"><div><strong>${esc(cli.nombre)}</strong> · ${esc(cli.tel)}${cli.email?' · '+esc(cli.email):''}</div><button class="btn btn-sm" style="padding:2px 8px;font-size:11px" onclick="editarCliente('${jsStr(cli.id)}')">✏ Editar datos</button></div>${fidelidadHTML(cli._uuid)}`}
 function _abrirModalEditarCliente(c){
   if(!c){toast('Cliente no encontrado','error');return}
   document.getElementById('ec-cid').value=c.id;
