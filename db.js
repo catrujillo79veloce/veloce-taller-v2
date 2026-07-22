@@ -29,6 +29,7 @@ function adaptCliente(row, bicis){
     nombre: row.nombre,
     tel: row.telefono,
     email: row.email,
+    alistadasCanjeadas: row.alistadas_canjeadas || 0,
     bicicletas: (bicis || []).map(adaptBici)
   };
 }
@@ -185,6 +186,7 @@ async function dbUpdateClienteByUuid(uuid, patches){
   if(patches.nombre !== undefined) dbPatch.nombre = patches.nombre;
   if(patches.tel !== undefined) dbPatch.telefono = patches.tel;
   if(patches.email !== undefined) dbPatch.email = patches.email || null;
+  if(patches.alistadasCanjeadas !== undefined) dbPatch.alistadas_canjeadas = patches.alistadasCanjeadas;
   const { error } = await sb.from('clientes').update(dbPatch).eq('id', uuid);
   if(error) throw error;
 }

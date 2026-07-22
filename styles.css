@@ -73,6 +73,10 @@ textarea{resize:vertical;min-height:60px}
 .pm-btn{padding:6px 14px;border-radius:20px;border:1px solid #e0e0e0;background:#fff;color:#888;font-size:12px;font-weight:600;cursor:pointer}
 .pm-btn.active{background:#111;color:#fff;border-color:#111}
 .lane-load{font-size:11px;color:#666;font-weight:600;padding:0 2px}
+.fidelidad-box{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;background:#f5f5f5;border-radius:8px;padding:6px 10px;font-size:12px;color:#444;margin-top:8px}
+.fidelidad-box .fid-dots{letter-spacing:2px;color:#D85A30;font-size:13px}
+.fidelidad-premio{background:#EAF3DE;color:#27500A;border:0.5px solid #BCD9A0}
+.fidelidad-premio .btn{background:#1D9E75;color:#fff;border-color:#1D9E75}
 .section{margin-bottom:10px}
 .cliente-info{background:#f5f5f5;border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:10px}
 .tipo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-bottom:6px}

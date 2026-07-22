@@ -11,6 +11,7 @@ create table clientes (
   nombre text not null,
   tel text not null,
   email text,
+  alistadas_canjeadas integer not null default 0, -- fidelidad: alistadas gratis ya reclamadas
   created_at timestamptz default now()
 );
 
