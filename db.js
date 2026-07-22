@@ -112,7 +112,7 @@ async function dbLoadAll(){
     sb.from('ordenes').select('*').order('created_at', { ascending: false }),
     sb.from('repuestos').select('*'),
     sb.from('checklist').select('*'),
-    sb.from('settings').select('*').eq('key', 'mecanicos').maybeSingle(),
+    sb.from('settings').select('*'),
     sb.from('consignaciones').select('*').order('created_at', { ascending: false })
   ]);
   const errors = [clRes.error, bcRes.error, ordRes.error, rpRes.error, chkRes.error, setRes.error, consRes.error].filter(Boolean);
@@ -141,11 +141,14 @@ async function dbLoadAll(){
     rpByOrden.get(o.id),
     chkByOrden.get(o.id)
   ));
-  const mecanicos = (setRes.data && setRes.data.value) || ['Carlos','Andrés','Juan'];
+  const settingsMap = {};
+  (setRes.data||[]).forEach(s => { settingsMap[s.key] = s.value; });
+  const mecanicos = settingsMap.mecanicos || ['Carlos','Andrés','Juan'];
+  const googleReviewUrl = settingsMap.google_review_url || '';
   const nextId = ordenes.reduce((m,o)=>Math.max(m,o.id),1000) + 1;
   const consignaciones = (consRes.data||[]).map(adaptConsignacion);
 
-  return { clientes, ordenes, mecanicos, nextId, consignaciones };
+  return { clientes, ordenes, mecanicos, googleReviewUrl, nextId, consignaciones };
 }
 
 // ===== Clientes =====
@@ -318,6 +321,10 @@ async function dbSetMecanicos(lista){
   const { error } = await sb.from('settings').upsert({ key: 'mecanicos', value: lista });
   if(error) throw error;
 }
+async function dbSetSetting(key, value){
+  const { error } = await sb.from('settings').upsert({ key, value });
+  if(error) throw error;
+}
 
 // ===== Storage (fotos) =====
 
@@ -394,6 +401,7 @@ window.db = {
   updateChecklist: dbUpdateChecklist,
   setReparaciones: dbSetReparaciones,
   setMecanicos: dbSetMecanicos,
+  setSetting: dbSetSetting,
   uploadFoto: dbUploadFoto,
   deleteFoto: dbDeleteFoto,
   createConsignacion: dbCreateConsignacion,
